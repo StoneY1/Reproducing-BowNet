@@ -51,7 +51,7 @@ class BowNet(nn.Module):
         self.resblock2_128 = ResidualBlock(in_channels=64, out_channels=128, kernel_size=3, downsample_factor=1)
         self.resblock3_256 = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2)
         self.resblock4_512 = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1)
-
+        
         self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
         self.fc_out = nn.Linear(512, self.num_classes)
 
@@ -63,8 +63,8 @@ class BowNet(nn.Module):
         x = self.resblock2_128(x)
         x = self.resblock3_256(x)
         x = self.resblock4_512(x)
-
-        x = self.global_avg_pool(x).reshape(1, -1)
+        
+        x = self.global_avg_pool(x).reshape(-1, 1, 512)
         x = self.fc_out(x)
         logits = x
         preds = F.softmax(x, dim=-1)
@@ -73,8 +73,8 @@ class BowNet(nn.Module):
 
 if __name__ == "__main__":
     bownet = BowNet(num_classes=100)
-    test_tensor = torch.randn((1, 3, 32, 32))
+    #test_tensor = torch.transpose(torch.randn((50000, 32, 32, 3)), 1, 3)
+    test_tensor = torch.transpose(torch.randn((5, 32, 32, 3)), 1, 3)
     test_logits, test_pred = bownet(test_tensor)
-    import pdb; pdb.set_trace()
 
 
