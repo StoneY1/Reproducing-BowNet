@@ -61,9 +61,11 @@ class Places205(data.Dataset):
         """
         image_path = os.path.join(self.data_folder, self.img_files[index])
         img = Image.open(image_path).convert('RGB')
+
         target = self.labels[index]
 
         if self.transform is not None:
+            img =np.array(img)
             img = self.transform(img)
         if self.target_transform is not None:
             target = self.target_transform(target)
@@ -87,6 +89,8 @@ class GenericDataset(data.Dataset):
         # in a semi-superivsed experiment. By default all the
         # available training examplers per category are being used.
         self.num_imgs_per_cat = num_imgs_per_cat
+
+        print(dataset_name)
 
         if self.dataset_name=='imagenet':
             assert(self.split=='train' or self.split=='val')
@@ -254,6 +258,7 @@ class DataLoader(object):
         ])
 
     def get_iterator(self, epoch=0):
+        print("get iterator")
         rand_seed = epoch * self.epoch_size
         random.seed(rand_seed)
         if self.unsupervised:
@@ -262,8 +267,11 @@ class DataLoader(object):
             # plus the label of the rotation, i.e., 0 for 0 degrees rotation,
             # 1 for 90 degrees, 2 for 180 degrees, and 3 for 270 degrees.
             def _load_function(idx):
+                print("load function")
                 idx = idx % len(self.dataset)
                 img0, _ = self.dataset[idx]
+                img0 = np.array(img0)
+                print(img0)
                 rotated_imgs = [
                     self.transform(img0),
                     self.transform(rotate_img(img0,  90)),
@@ -285,6 +293,7 @@ class DataLoader(object):
             def _load_function(idx):
                 idx = idx % len(self.dataset)
                 img, categorical_label = self.dataset[idx]
+                img =np.array(img)
                 img = self.transform(img)
                 return img, categorical_label
             _collate_fun = default_collate
@@ -297,6 +306,8 @@ class DataLoader(object):
         return data_loader
 
     def __call__(self, epoch=0):
+        print("call")
+        print(epoch)
         return self.get_iterator(epoch)
 
     def __len__(self):
@@ -305,7 +316,7 @@ class DataLoader(object):
 if __name__ == '__main__':
     from matplotlib import pyplot as plt
 
-    dataset = GenericDataset('imagenet','train', random_sized_crop=True)
+    dataset = GenericDataset('cifar100','train')
     dataloader = DataLoader(dataset, batch_size=8, unsupervised=True)
 
     for b in dataloader(0):

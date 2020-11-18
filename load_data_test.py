@@ -3,7 +3,7 @@ import argparse
 import os
 import imp
 from dataloader import DataLoader, GenericDataset
-
+import matplotlib.pyplot as plt
 
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
@@ -24,13 +24,15 @@ data_test_opt['random_sized_crop'] = False
 data_test_opt['dataset_name'] = 'cifar100'
 data_test_opt['split'] = 'test'
 
-num_imgs_per_cat = data_train_opt['num_imgs_per_cat'] if ('num_imgs_per_cat' in data_train_opt) else None
+imgs_per_cat = data_train_opt['imgs_per_cat'] if ('imgs_per_cat' in data_train_opt) else None
+
+print(imgs_per_cat)
 
 dataset_train = GenericDataset(
     dataset_name=data_train_opt['dataset_name'],
     split=data_train_opt['split'],
     random_sized_crop=data_train_opt['random_sized_crop'],
-    num_imgs_per_cat=num_imgs_per_cat)
+    num_imgs_per_cat=imgs_per_cat)
 dataset_test = GenericDataset(
     dataset_name=data_test_opt['dataset_name'],
     split=data_test_opt['split'],
@@ -51,3 +53,13 @@ dloader_test = DataLoader(
     epoch_size=data_test_opt['epoch_size'],
     num_workers=4,
     shuffle=False)
+
+for b in dloader_train(0):
+  data,label = b
+  print("data: ",data.shape)
+  print(data[0].shape)
+  plt.imshow(data[0].permute(1, 2, 0))
+  plt.show()
+  print("label: ",label.shape)
+  print(label[0])
+  break
