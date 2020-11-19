@@ -15,6 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import time
+import numpy as np
 
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
@@ -96,11 +97,13 @@ optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9)
 with torch.cuda.device(0):
     for epoch in range(num_epochs):  # loop over the dataset multiple times
 
+        print("Training")
         running_loss = 0.0
         loss_100 = 0.0
 
         print("number of batch: ",len(dloader_train))
         start_epoch = time.time()
+        accs = []
         for idx, batch in enumerate(tqdm(dloader_train(epoch))):
             start_time = time.time()
             # get the inputs; data is a list of [inputs, labels]
@@ -137,6 +140,8 @@ with torch.cuda.device(0):
 
             loss_100 += loss.item()
 
+            accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
+
             if idx % 100 == 99:
                 print('[%d, %5d] loss: %.3f' %
                       (epoch , idx, loss_100/100))
@@ -147,14 +152,56 @@ with torch.cuda.device(0):
 
         # plt.imshow(check_input)
         # plt.savefig("imag" + str(epoch) + ".png")
-        acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
-        print("epoches accuracy: ",acc)
+        accs = np.array(accs)
+        print("epoch training accuracy: ",accs.mean())
 
         print("Time to load the data", time_load_data)
         print("Time to finish an epoch ", time.time() - start_epoch)
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_train), running_loss / len(dloader_train)))
 
+        print("Evaluation")
+
+        print("number of batch: ",len(dloader_test))
+        start_epoch = time.time()
+        running_loss = 0.0
+        accs = []
+        for idx, batch in enumerate(tqdm(dloader_test(epoch))):
+            start_time = time.time()
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = batch
+
+            #Load data to GPU
+            inputs, labels = inputs.cuda(), labels.cuda()
+            time_load_data = time.time() - start_time
+
+
+            # forward + backward + optimize
+            logits, preds = bownet(inputs)
+
+            # print(preds[:,0])
+
+            #Compute loss
+            loss = criterion(preds[:,0], labels)
+
+
+            # print statistics
+            running_loss += loss.item()
+
+            accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
+
+
+        # plt.imshow(check_input)
+        # plt.savefig("imag" + str(epoch) + ".png")
+        accs = np.array(accs)
+        print("epoche test accuracy: ",accs.mean())
+
+        print("Time to load the data", time_load_data)
+        print("Time to finish an epoch ", time.time() - start_epoch)
+        print('[%d, %5d] epoches loss: %.3f' %
+              (epoch, len(dloader_test), running_loss / len(dloader_test)))
+
+        #Save the model
         file_name = 'saved_model_state.pt'
         torch.save(bownet.state_dict(), file_name)
 
