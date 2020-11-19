@@ -44,13 +44,15 @@ class BowNet(nn.Module):
         self.num_classes = num_classes
         self.conv1_64 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.bn1_64 = nn.BatchNorm2d(num_features=64)
-        #self.max_pool1 = nn.MaxPool2d(kernel_size=3, stride=2) 
-        # Inspired by the All-Convolutional Net (https://arxiv.org/abs/1412.6806), we removed the MaxPooling layer
 
-        self.resblock1_64 = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=2)
-        self.resblock2_128 = ResidualBlock(in_channels=64, out_channels=128, kernel_size=3, downsample_factor=1)
-        self.resblock3_256 = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2)
-        self.resblock4_512 = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1)
+        self.resblock1_64a = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=2)
+        self.resblock1_64b = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=1)
+        self.resblock2_128a = ResidualBlock(in_channels=64, out_channels=128, kernel_size=3, downsample_factor=1)
+        self.resblock2_128b = ResidualBlock(in_channels=128, out_channels=128, kernel_size=3, downsample_factor=1)
+        self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2)
+        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1)
+        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1)
+        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
         
         self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
         self.fc_out = nn.Linear(512, self.num_classes)
@@ -59,10 +61,18 @@ class BowNet(nn.Module):
         """Forward pass of our BowNet-lite"""
 
         x = F.relu(self.bn1_64(self.conv1_64(input_tensor)))
-        x = self.resblock1_64(x)
-        x = self.resblock2_128(x)
-        x = self.resblock3_256(x)
-        x = self.resblock4_512(x)
+        x = self.resblock1_64a(x)
+        x = self.resblock1_64b(x)
+        x = self.resblock2_128a(x)
+        x = self.resblock2_128b(x)
+        x = self.resblock3_256a(x)
+        x = self.resblock3_256b(x)
+        
+        # We will need these feature maps for the K-means clustering to create a Visual BoW vocabulary
+        self.resblock3_256b_fmaps = x 
+
+        x = self.resblock4_512a(x)
+        x = self.resblock4_512b(x)
         
         x = self.global_avg_pool(x).reshape(-1, 1, 512)
         x = self.fc_out(x)
@@ -75,6 +85,7 @@ if __name__ == "__main__":
     bownet = BowNet(num_classes=100)
     #test_tensor = torch.transpose(torch.randn((50000, 32, 32, 3)), 1, 3)
     test_tensor = torch.transpose(torch.randn((5, 32, 32, 3)), 1, 3)
-    test_logits, test_pred = bownet(test_tensor)
+
+    test_logits, test_preds = bownet(test_tensor)
 
 

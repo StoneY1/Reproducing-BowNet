@@ -56,26 +56,26 @@ dloader_test = DataLoader(
     num_workers=4,
     shuffle=False)
 
-i = 0
-for b in dloader_train(0):
-    data,label = b
-    print("data: ",data.shape)
-    print(data[1].shape)
-    plt.imshow(data[1].permute(1, 2, 0))
-    plt.show()
-    print("label: ",label.shape)
-    print(label)
-    break
-  # i +=1
-  # if i == 10:
-  #     break
 
-bownet = model.BowNet(num_classes=100)
-#test_tensor = torch.transpose(torch.randn((50000, 32, 32, 3)), 1, 3)
-test_tensor = data
-test_logits, test_pred = bownet(test_tensor)
+if __name__ == "__main__":
+    i = 0
+    for b in dloader_train(0):
+        data,label = b
+        print("data: ",data.shape)
+        print(data[1].shape)
+        plt.imshow(data[1].permute(1, 2, 0))
+        plt.show()
+        print("label: ",label.shape)
+        print(label)
+        break
+      # i +=1
+      # if i == 10:
+      #     break
 
-print(test_logits)
-print(test_pred)
-print("logit shape: ",test_logits.shape)
-print("predict shape: ",test_pred.shape)
+    bownet = model.BowNet(num_classes=100)
+    #test_tensor = torch.transpose(torch.randn((50000, 32, 32, 3)), 1, 3)
+    test_tensor = data
+    test_logits, test_pred = bownet(test_tensor)
+
+    print(test_logits)
+    print(test_pred)
