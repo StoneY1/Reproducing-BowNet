@@ -97,7 +97,8 @@ optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9)
 with torch.cuda.device(0):
     for epoch in range(num_epochs):  # loop over the dataset multiple times
 
-        print("Training")
+        print()
+        print("TRAINING")
         running_loss = 0.0
         loss_100 = 0.0
 
@@ -160,7 +161,16 @@ with torch.cuda.device(0):
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_train), running_loss / len(dloader_train)))
 
-        print("Evaluation")
+        PATH = "bownet_checkpoint"
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': bownet.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,
+            }, PATH)
+
+        print()
+        print("EVALUATION")
 
         print("number of batch: ",len(dloader_test))
         start_epoch = time.time()
@@ -201,9 +211,7 @@ with torch.cuda.device(0):
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_test), running_loss / len(dloader_test)))
 
-        #Save the model
-        file_name = 'saved_model_state.pt'
-        torch.save(bownet.state_dict(), file_name)
+
 
 
 print('Finished Training')
