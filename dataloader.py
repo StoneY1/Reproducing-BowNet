@@ -144,6 +144,7 @@ class GenericDataset(data.Dataset):
             self.transform = transforms.Compose(transforms_list)
             self.data = Places205(root=_PLACES205_DATASET_DIR, split=self.split,
                 transform=self.transform)
+        ###CIFAR100
         elif self.dataset_name=='cifar100':
             self.mean_pix = [x/255.0 for x in [125.3, 123.0, 113.9]]
             self.std_pix = [x/255.0 for x in [63.0, 62.1, 66.7]]
@@ -153,7 +154,7 @@ class GenericDataset(data.Dataset):
 
             transform = []
             if (split != 'test'):
-                transform.append(transforms.RandomCrop(32, padding=4))
+                # transform.append(transforms.RandomCrop(32, padding=4))
                 transform.append(transforms.RandomHorizontalFlip())
             transform.append(lambda x: np.asarray(x))
             self.transform = transforms.Compose(transform)
@@ -221,11 +222,11 @@ def rotate_img(img, rot):
     if rot == 0: # 0 degrees rotation
         return img
     elif rot == 90: # 90 degrees rotation
-        return np.flipud(np.transpose(img, (1,0,2)))
+        return np.flipud(np.transpose(img, (1,0,2))).copy()
     elif rot == 180: # 90 degrees rotation
-        return np.fliplr(np.flipud(img))
+        return np.fliplr(np.flipud(img)).copy()
     elif rot == 270: # 270 degrees rotation / or -90
-        return np.transpose(np.flipud(img), (1,0,2))
+        return np.transpose(np.flipud(img), (1,0,2)).copy()
     else:
         raise ValueError('rotation should be 0, 90, 180, or 270 degrees')
 
@@ -248,8 +249,8 @@ class DataLoader(object):
         mean_pix  = self.dataset.mean_pix
         std_pix   = self.dataset.std_pix
         self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=mean_pix, std=std_pix)
+            transforms.ToTensor()
+            # transforms.Normalize(mean=mean_pix, std=std_pix)
         ])
         self.inv_transform = transforms.Compose([
             Denormalize(mean_pix, std_pix),
@@ -258,7 +259,7 @@ class DataLoader(object):
         ])
 
     def get_iterator(self, epoch=0):
-        print("get iterator")
+        # print("get iterator")
         rand_seed = epoch * self.epoch_size
         random.seed(rand_seed)
         if self.unsupervised:
@@ -267,11 +268,11 @@ class DataLoader(object):
             # plus the label of the rotation, i.e., 0 for 0 degrees rotation,
             # 1 for 90 degrees, 2 for 180 degrees, and 3 for 270 degrees.
             def _load_function(idx):
-                print("load function")
+                # print("load function")
                 idx = idx % len(self.dataset)
                 img0, _ = self.dataset[idx]
                 img0 = np.array(img0)
-                print(img0)
+                # print(img0)
                 rotated_imgs = [
                     self.transform(img0),
                     self.transform(rotate_img(img0,  90)),
@@ -311,7 +312,7 @@ class DataLoader(object):
         return self.get_iterator(epoch)
 
     def __len__(self):
-        return self.epoch_size / self.batch_size
+        return self.epoch_size // self.batch_size
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt
