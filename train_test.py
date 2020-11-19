@@ -161,7 +161,7 @@ with torch.cuda.device(0):
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_train), running_loss / len(dloader_train)))
 
-        PATH = "bownet_checkpoint"
+        PATH = "bownet_checkpoint.pt"
         torch.save({
             'epoch': epoch,
             'model_state_dict': bownet.state_dict(),
