@@ -77,3 +77,5 @@ test_logits, test_pred = bownet(test_tensor)
 
 print(test_logits)
 print(test_pred)
+print("logit shape: ",test_logits.shape)
+print("predict shape: ",test_pred.shape)
