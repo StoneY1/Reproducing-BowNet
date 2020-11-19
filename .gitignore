@@ -1,6 +1,6 @@
 datasets/
 __pycache__/
-.ipynb_checkpoints
-.ipynb
-.png
-.pt
+*.ipynb_checkpoints
+*.ipynb
+*.png
+*.pt
