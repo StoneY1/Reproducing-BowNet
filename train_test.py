@@ -155,7 +155,7 @@ with torch.cuda.device(0):
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_train), running_loss / len(dloader_train)))
 
-        file_name = 'saved_model_state' + str(epoch) + '.pt'
+        file_name = 'saved_model_state.pt'
         torch.save(bownet.state_dict(), file_name)
 
 
