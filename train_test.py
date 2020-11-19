@@ -9,7 +9,7 @@ from dataloader import DataLoader, GenericDataset
 import matplotlib.pyplot as plt
 
 from model import BowNet
-import tqdm
+from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -36,6 +36,23 @@ data_test_opt['dataset_name'] = 'cifar100'
 data_test_opt['split'] = 'test'
 
 imgs_per_cat = data_train_opt['imgs_per_cat'] if ('imgs_per_cat' in data_train_opt) else None
+
+
+def accuracy(output, target, topk=(1,)):
+    """Computes the precision@k for the specified values of k"""
+    maxk = max(topk)
+    batch_size = target.size(0)
+
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+    res = []
+    for k in topk:
+        correct_k = correct[:k].view(-1).float().sum(0)
+        res.append(correct_k.mul_(100.0 / batch_size))
+    return res
+
 
 
 dataset_train = GenericDataset(
@@ -69,7 +86,7 @@ dloader_test = DataLoader(
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 num_epochs = 200
-bownet = BowNet(num_classes=100).to(device)
+bownet = BowNet(num_classes=4).to(device)
 criterion = nn.CrossEntropyLoss().to(device)
 optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9)
 
@@ -84,7 +101,7 @@ with torch.cuda.device(0):
 
         print("number of batch: ",len(dloader_train))
         start_epoch = time.time()
-        for idx, batch in enumerate(dloader_train(epoch)):
+        for idx, batch in enumerate(tqdm(dloader_train(epoch))):
             start_time = time.time()
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = batch
@@ -110,6 +127,7 @@ with torch.cuda.device(0):
             #Compute loss
             loss = criterion(preds[:,0], labels)
 
+
             #Back Prop and Optimize
             loss.backward()
             optimizer.step()
@@ -123,17 +141,22 @@ with torch.cuda.device(0):
                 print('[%d, %5d] loss: %.3f' %
                       (epoch , idx, loss_100/100))
                 loss_100 = 0.0
+                acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
+                print("accuracy 100 batch: ",acc)
                 print("Time to finish 100 batch", time.time() - start_time)
-        plt.imshow(check_input)
-        plt.savefig("imag" + str(epoch) + ".png")
+
+        # plt.imshow(check_input)
+        # plt.savefig("imag" + str(epoch) + ".png")
+        acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
+        print("epoches accuracy: ",acc)
 
         print("Time to load the data", time_load_data)
         print("Time to finish an epoch ", time.time() - start_epoch)
-        print('[%d, %5d] loss: %.3f' %
+        print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_train), running_loss / len(dloader_train)))
 
-
-        torch.save(bownet.state_dict(), 'saved_model_state.pt')
+        file_name = 'saved_model_state' + str(epoch) + '.pt'
+        torch.save(bownet.state_dict(), file_name)
 
 
 print('Finished Training')

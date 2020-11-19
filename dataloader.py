@@ -316,8 +316,6 @@ class DataLoader(object):
         return data_loader
 
     def __call__(self, epoch=0):
-        print("call")
-        print(epoch)
         return self.get_iterator(epoch)
 
     def __len__(self):
