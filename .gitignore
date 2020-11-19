@@ -4,3 +4,4 @@ __pycache__/
 *.ipynb
 *.png
 *.pt
+bownet_checkpoint
