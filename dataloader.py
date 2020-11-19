@@ -1,3 +1,10 @@
+"""
+Data-loader from original RotNet paper's code
+Gidaris et. al https://arxiv.org/abs/1803.07728
+https://github.com/gidariss/FeatureLearningRotNet
+
+"""
+
 from __future__ import print_function
 import torch
 import torch.utils.data as data
@@ -75,6 +82,7 @@ class Places205(data.Dataset):
         return len(self.labels)
 
 class GenericDataset(data.Dataset):
+    """Will contain CIFAR100 dataset here"""
     def __init__(self, dataset_name, split, random_sized_crop=False,
                  num_imgs_per_cat=None):
         self.split = split.lower()
@@ -232,6 +240,7 @@ def rotate_img(img, rot):
 
 
 class DataLoader(object):
+    """If flag is set to unsupervised, will generate the rotations and rotation-labels during training"""
     def __init__(self,
                  dataset,
                  batch_size=1,
