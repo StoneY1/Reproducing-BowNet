@@ -61,14 +61,14 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
             inputs, _ = data
 
             # Forward data through bownet, then get resblock_3_256b fmaps
-            # The authors propose densely sampling feature C-dimensional feature vectors at each 
+            # The authors propose densely sampling feature C-dimensional feature vectors at each
             # spatial location where C is the size of the channel dimension. These feature vectors are used for the KMeans clustering
             outputs = bownet(inputs)
             # TODO need to verify that bownet.resblock3_256b_fmaps is actually getting updated after calling bownet.forward()
             resblock3_fmaps = bownet.resblock3_256b_fmaps
             resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[1])
             feature_vectors_list.extend(resblock3_feature_vectors)
-    
+
     rotnet_feature_vectors = np.array(feature_vectors_list)
 
     '''
@@ -84,6 +84,4 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
 
     return sk_kmeans, rotnet_vocab
 
-# TODO Need to implement the histogram creation. maybe 
-            
-
+# TODO Need to implement the histogram creation. maybe
