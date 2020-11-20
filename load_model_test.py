@@ -82,7 +82,7 @@ dloader_test = DataLoader(
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-PATH = "bownet_checkpoint_158"
+PATH = "bownet_checkpoint"
 checkpoint = torch.load(PATH)
 # num_epochs = 200
 # bownet = BowNet(num_classes=4).to(device)
