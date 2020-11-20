@@ -105,7 +105,7 @@ with torch.cuda.device(0):
         print("number of batch: ",len(dloader_train))
         start_epoch = time.time()
         accs = []
-        for idx, batch in enumerate(tqdm(dloader_train(epoch))):
+        for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
             start_time = time.time()
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = batch
@@ -176,7 +176,7 @@ with torch.cuda.device(0):
         start_epoch = time.time()
         running_loss = 0.0
         accs = []
-        for idx, batch in enumerate(tqdm(dloader_test(epoch))):
+        for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
             start_time = time.time()
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = batch
