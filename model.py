@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 
 class ResidualBlock(nn.Module):
     """Basic 2-layer residual block as described in the original ResNet paper https://arxiv.org/abs/1512.03385"""
@@ -81,6 +82,17 @@ class BowNet(nn.Module):
         preds = F.softmax(x, dim=-1)
 
         return logits, preds
+
+def load_checkpoint(checkpoint,device):
+    bownet = BowNet(num_classes=4).to(device)
+    optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9,weight_decay= 5e-4)
+
+    bownet.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    loss = checkpoint['loss']
+
+    return bownet, optimizer, epoch, loss
 
 if __name__ == "__main__":
     bownet = BowNet(num_classes=100)

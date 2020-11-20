@@ -89,7 +89,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_epochs = 200
 bownet = BowNet(num_classes=4).to(device)
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9)
+optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9,weight_decay= 5e-4)
 
 # tensors = {}
 # tensors['dataX'] = torch.FloatTensor()
@@ -103,9 +103,12 @@ with torch.cuda.device(0):
         loss_100 = 0.0
 
         print("number of batch: ",len(dloader_train))
+        print("current learning rate: ", optimizer.param_groups[0]['lr'])
         start_epoch = time.time()
         accs = []
+
         for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
+
             start_time = time.time()
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = batch
