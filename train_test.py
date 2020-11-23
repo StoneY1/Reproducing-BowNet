@@ -103,7 +103,6 @@ with torch.cuda.device(0):
         loss_100 = 0.0
 
         print("number of batch: ",len(dloader_train))
-        print("current learning rate: ", optimizer.param_groups[0]['lr'])
         start_epoch = time.time()
         accs = []
 

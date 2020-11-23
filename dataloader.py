@@ -27,8 +27,6 @@ from pdb import set_trace as breakpoint
 
 # Set the paths of the datasets here.
 _CIFAR_DATASET_DIR = './datasets/CIFAR'
-_IMAGENET_DATASET_DIR = './datasets/IMAGENET/ILSVRC2012'
-_PLACES205_DATASET_DIR = './datasets/Places205'
 
 
 def buildLabelIndex(labels):
@@ -40,46 +38,6 @@ def buildLabelIndex(labels):
 
     return label2inds
 
-class Places205(data.Dataset):
-    def __init__(self, root, split, transform=None, target_transform=None):
-        self.root = os.path.expanduser(root)
-        self.data_folder  = os.path.join(self.root, 'data', 'vision', 'torralba', 'deeplearning', 'images256')
-        self.split_folder = os.path.join(self.root, 'trainvalsplit_places205')
-        assert(split=='train' or split=='val')
-        split_csv_file = os.path.join(self.split_folder, split+'_places205.csv')
-
-        self.transform = transform
-        self.target_transform = target_transform
-        with open(split_csv_file, 'rb') as f:
-            reader = csv.reader(f, delimiter=' ')
-            self.img_files = []
-            self.labels = []
-            for row in reader:
-                self.img_files.append(row[0])
-                self.labels.append(long(row[1]))
-
-    def __getitem__(self, index):
-        """
-        Args:
-            index (int): Index
-
-        Returns:
-            tuple: (image, target) where target is index of the target class.
-        """
-        image_path = os.path.join(self.data_folder, self.img_files[index])
-        img = Image.open(image_path).convert('RGB')
-
-        target = self.labels[index]
-
-        if self.transform is not None:
-            img =np.array(img)
-            img = self.transform(img)
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-        return img, target
-
-    def __len__(self):
-        return len(self.labels)
 
 class GenericDataset(data.Dataset):
     """Will contain CIFAR100 dataset here"""
@@ -98,79 +56,28 @@ class GenericDataset(data.Dataset):
         # available training examplers per category are being used.
         self.num_imgs_per_cat = num_imgs_per_cat
 
-        print(dataset_name)
+        # print(dataset_name)
+        print("Prepare data for: ",split)
 
-        if self.dataset_name=='imagenet':
-            assert(self.split=='train' or self.split=='val')
-            self.mean_pix = [0.485, 0.456, 0.406]
-            self.std_pix = [0.229, 0.224, 0.225]
 
-            if self.split!='train':
-                transforms_list = [
-                    transforms.Scale(256),
-                    transforms.CenterCrop(224),
-                    lambda x: np.asarray(x),
-                ]
-            else:
-                if self.random_sized_crop:
-                    transforms_list = [
-                        transforms.RandomSizedCrop(224),
-                        transforms.RandomHorizontalFlip(),
-                        lambda x: np.asarray(x),
-                    ]
-                else:
-                    transforms_list = [
-                        transforms.Scale(256),
-                        transforms.RandomCrop(224),
-                        transforms.RandomHorizontalFlip(),
-                        lambda x: np.asarray(x),
-                    ]
-            self.transform = transforms.Compose(transforms_list)
-            split_data_dir = _IMAGENET_DATASET_DIR + '/' + self.split
-            self.data = datasets.ImageFolder(split_data_dir, self.transform)
-        elif self.dataset_name=='places205':
-            self.mean_pix = [0.485, 0.456, 0.406]
-            self.std_pix = [0.229, 0.224, 0.225]
-            if self.split!='train':
-                transforms_list = [
-                    transforms.CenterCrop(224),
-                    lambda x: np.asarray(x),
-                ]
-            else:
-                if self.random_sized_crop:
-                    transforms_list = [
-                        transforms.RandomSizedCrop(224),
-                        transforms.RandomHorizontalFlip(),
-                        lambda x: np.asarray(x),
-                    ]
-                else:
-                    transforms_list = [
-                        transforms.RandomCrop(224),
-                        transforms.RandomHorizontalFlip(),
-                        lambda x: np.asarray(x),
-                    ]
-            self.transform = transforms.Compose(transforms_list)
-            self.data = Places205(root=_PLACES205_DATASET_DIR, split=self.split,
-                transform=self.transform)
         ###CIFAR100
-        elif self.dataset_name=='cifar100':
-            self.mean_pix = [x/255.0 for x in [125.3, 123.0, 113.9]]
-            self.std_pix = [x/255.0 for x in [63.0, 62.1, 66.7]]
 
-            if self.random_sized_crop:
-                raise ValueError('The random size crop option is not supported for the CIFAR dataset')
+        #this mean and std is from CIFAR10
+        self.mean_pix = [x/255.0 for x in [125.3, 123.0, 113.9]]
+        self.std_pix = [x/255.0 for x in [63.0, 62.1, 66.7]]
 
-            transform = []
-            if (split != 'test'):
-                # transform.append(transforms.RandomCrop(32, padding=4))
-                transform.append(transforms.RandomHorizontalFlip())
-            transform.append(lambda x: np.asarray(x))
-            self.transform = transforms.Compose(transform)
-            self.data = datasets.__dict__[self.dataset_name.upper()](
-                _CIFAR_DATASET_DIR, train=self.split=='train',
-                download=True, transform=self.transform)
-        else:
-            raise ValueError('Not recognized dataset {0}'.format(dname))
+        if self.random_sized_crop:
+            raise ValueError('The random size crop option is not supported for the CIFAR dataset')
+
+        transform = []
+        if (split != 'test'): #If load training data, the perform augmentation
+            # transform.append(transforms.RandomCrop(32, padding=4))
+            transform.append(transforms.RandomHorizontalFlip())
+        transform.append(lambda x: np.asarray(x))
+        self.transform = transforms.Compose(transform)
+        self.data = datasets.__dict__[self.dataset_name.upper()](
+            _CIFAR_DATASET_DIR, train=self.split=='train',
+            download=True, transform=self.transform)
 
         if num_imgs_per_cat is not None:
             self._keep_first_k_examples_per_category(num_imgs_per_cat)
@@ -325,17 +232,18 @@ if __name__ == '__main__':
     from matplotlib import pyplot as plt
 
     dataset = GenericDataset('cifar100','train')
-    dataloader = DataLoader(dataset, batch_size=8, unsupervised=True)
+    dataloader = DataLoader(dataset, batch_size=8, unsupervised=False)
 
     for b in dataloader(0):
         data, label = b
+        print(label)
         break
 
-    inv_transform = dataloader.inv_transform
-    for i in range(data.size(0)):
-        plt.subplot(data.size(0)/4,4,i+1)
-        fig=plt.imshow(inv_transform(data[i]))
-        fig.axes.get_xaxis().set_visible(False)
-        fig.axes.get_yaxis().set_visible(False)
+    # inv_transform = dataloader.inv_transform
+    # for i in range(data.size(0)):
+    #     plt.subplot(data.size(0)/4,4,i+1)
+    #     fig=plt.imshow(inv_transform(data[i]))
+    #     fig.axes.get_xaxis().set_visible(False)
+    #     fig.axes.get_yaxis().set_visible(False)
 
     plt.show()

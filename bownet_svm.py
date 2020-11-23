@@ -14,12 +14,15 @@ import torch.optim as optim
 import time
 import numpy as np
 
+from sklearn.svm import LinearSVC
+from sklearn.linear_model import LogisticRegression
+
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
 
 data_train_opt = {}
 data_train_opt['batch_size'] = batch_size
-data_train_opt['unsupervised'] = True
+data_train_opt['unsupervised'] = False #Set to False then the label is the class - Set to True to get rotation label
 data_train_opt['epoch_size'] = None
 data_train_opt['random_sized_crop'] = False
 data_train_opt['dataset_name'] = 'cifar100'
@@ -27,7 +30,7 @@ data_train_opt['split'] = 'train'
 
 data_test_opt = {}
 data_test_opt['batch_size'] = batch_size
-data_test_opt['unsupervised'] = True
+data_test_opt['unsupervised'] = False #Set to False then the label is the class - Set to True to get rotation label
 data_test_opt['epoch_size'] = None
 data_test_opt['random_sized_crop'] = False
 data_test_opt['dataset_name'] = 'cifar100'
@@ -50,6 +53,40 @@ def accuracy(output, target, topk=(1,)):
         correct_k = correct[:k].view(-1).float().sum(0)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
+
+
+def get_feature_map(model,dloader):
+    with torch.no_grad():
+
+        features = []
+        labels = []
+        for batch in dloader(0):
+
+            inputs, labels_batch = batch
+
+            inputs = inputs.cuda() #Load input to cuda for fast inference
+
+            model(inputs) #Feed data to bownet
+
+            feature = model.resblock3_256b_fmaps #Get the feature map
+
+        #Net to run flatten here
+            feature = feature.cpu().numpy() #Need to transfer to numpy
+
+            features.append(feature)
+
+
+
+            # print(feature.shape)
+
+            labels_batch = labels_batch.numpy()
+            labels.append(labels_batch)
+            # print(labels_batch.shape)
+    features = np.concatenate(features)
+
+    labels = np.concatenate(labels)
+
+    return features,labels
 
 
 
@@ -84,107 +121,47 @@ dloader_test = DataLoader(
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 PATH = "bownet_checkpoint"
 checkpoint = torch.load(PATH)
-# num_epochs = 200
-# bownet = BowNet(num_classes=4).to(device)
-# criterion = nn.CrossEntropyLoss().to(device)
-# optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9,weight_decay= 5e-4)
-#
-#
-# bownet.load_state_dict(checkpoint['model_state_dict'])
-# optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-# epoch = checkpoint['epoch']
-# loss = checkpoint['loss']
+
 bownet,optimizer,epoch,loss = load_checkpoint(checkpoint,device)
 
 criterion = nn.CrossEntropyLoss().to(device)
-# optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9,weight_decay= 5e-4)
 
-# tensors = {}
-# tensors['dataX'] = torch.FloatTensor()
-# tensors['labels'] = torch.LongTensor()
+
 with torch.cuda.device(0):
+    for para in bownet.parameters():
+        para.requires_grad = False
+
+
+
     # for epoch in range(num_epochs):  # loop over the dataset multiple times
 
-        # print()
-        # print("TRAINING")
-        # running_loss = 0.0
-        # loss_100 = 0.0
-        #
-        # print("number of batch: ",len(dloader_train))
-        # print("current learning rate: ", optimizer.param_groups[0]['lr'])
-        # start_epoch = time.time()
-        # accs = []
+    print()
+    print("TRAINING")
+    running_loss = 0.0
+    loss_100 = 0.0
 
-        # for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
-        #
-        #     start_time = time.time()
-        #     # get the inputs; data is a list of [inputs, labels]
-        #     inputs, labels = batch
-        #
-        #     check_input = inputs[0].permute(1, 2, 0)
-        #
-        #
-        #     #Load data to GPU
-        #     inputs, labels = inputs.cuda(), labels.cuda()
-        #     time_load_data = time.time() - start_time
-        #
-        #     # print(labels)
-        #
-        #
-        #     # zero the parameter gradients
-        #     optimizer.zero_grad()
-        #
-        #     # forward + backward + optimize
-        #     logits, preds = bownet(inputs)
-        #
-        #     # print(preds[:,0])
-        #
-        #     #Compute loss
-        #     loss = criterion(preds[:,0], labels)
-        #
-        #
-        #     #Back Prop and Optimize
-        #     loss.backward()
-        #     optimizer.step()
-        #
-        #     # print statistics
-        #     running_loss += loss.item()
-        #
-        #     loss_100 += loss.item()
-        #
-        #     accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
-        #
-        #     if idx % 100 == 99:
-        #         print('[%d, %5d] loss: %.3f' %
-        #               (epoch , idx, loss_100/100))
-        #         loss_100 = 0.0
-        #         acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
-        #         print("accuracy 100 batch: ",acc)
-        #         print("Time to finish 100 batch", time.time() - start_time)
-        #
-        # # plt.imshow(check_input)
-        # # plt.savefig("imag" + str(epoch) + ".png")
-        # accs = np.array(accs)
-        # print("epoch training accuracy: ",accs.mean())
-        #
-        # print("Time to load the data", time_load_data)
-        # print("Time to finish an epoch ", time.time() - start_epoch)
-        # print('[%d, %5d] epoches loss: %.3f' %
-        #       (epoch, len(dloader_train), running_loss / len(dloader_train)))
-        #
-        # PATH = "bownet_checkpoint.pt"
-        # torch.save({
-        #     'epoch': epoch,
-        #     'model_state_dict': bownet.state_dict(),
-        #     'optimizer_state_dict': optimizer.state_dict(),
-        #     'loss': loss,
-        #     }, PATH)
-        #
-        # print()
+    print("number of batch: ",len(dloader_train))
+
+    accs = []
+
+    feature_train, labels = get_feature_map(bownet,dloader_train)
+
+
+    print(feature_train.shape)
+    print(labels.shape)
+
+    feature_train = feature_train.reshape((feature_train.shape[0],-1))
+
+    print(feature_train.shape)
+
+    clf = LinearSVC(random_state=0, tol=1e-5)
+
+    clf.fit(feature_train,labels)
+
     print("EVALUATION")
 
     print("number of batch: ",len(dloader_test))
-    start_epoch = time.time()
+
     running_loss = 0.0
     accs = []
     for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
@@ -198,7 +175,13 @@ with torch.cuda.device(0):
 
 
         # forward + backward + optimize
+
+
         logits, preds = bownet(inputs)
+
+        feature_test = bownet.resblock3_256b_fmaps
+
+        print(x.shape)
 
         # print(preds[:,0])
 
@@ -223,10 +206,3 @@ with torch.cuda.device(0):
     print("Time to finish an epoch ", time.time() - start_epoch)
     print('[%d, %5d] epoches loss: %.3f' %
           (epoch, len(dloader_test), running_loss / len(dloader_test)))
-    print(preds.data)
-    print(labels)
-
-
-
-
-print('Finished Training')
