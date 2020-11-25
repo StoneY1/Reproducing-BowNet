@@ -79,6 +79,30 @@ class BowNet(nn.Module):
         x = self.global_avg_pool(x).reshape(-1, 1, 512)
         x = self.fc_out(x)
         logits = x
+        # print("bownet x shape", x.shape)
+        preds = F.softmax(x, dim=-1)
+
+        return logits, preds
+
+
+class LinearClassifier(nn.Module):
+
+    def __init__(self, num_classes):
+        """Define layers"""
+        super().__init__()
+        self.num_classes = num_classes
+        self.fc_out = nn.Linear(16384,self.num_classes)
+
+
+    def forward(self, input_tensor):
+        x = input_tensor.view(input_tensor.size(0), -1)
+
+        x = self.fc_out(x)
+
+
+        x = x.reshape(-1, 1, 100)
+
+        logits = x
         preds = F.softmax(x, dim=-1)
 
         return logits, preds

@@ -52,45 +52,14 @@ def accuracy(output, target, topk=(1,)):
     pred = pred.t()
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
+
+
     res = []
     for k in topk:
         correct_k = correct[:k].view(-1).float().sum(0)
         res.append(correct_k.mul_(100.0 / batch_size))
+
     return res
-
-
-def get_feature_map(model,dloader):
-    with torch.no_grad():
-
-        features = []
-        labels = []
-        for batch in dloader(0):
-
-            inputs, labels_batch = batch
-
-            inputs = inputs.cuda() #Load input to cuda for fast inference
-
-            model(inputs) #Feed data to bownet
-
-            feature = model.resblock3_256b_fmaps #Get the feature map
-
-        #Net to run flatten here
-            feature = feature.cpu().numpy() #Need to transfer to numpy
-
-            features.append(feature)
-
-
-
-            # print(feature.shape)
-
-            labels_batch = labels_batch.numpy()
-            labels.append(labels_batch)
-            # print(labels_batch.shape)
-    features = np.concatenate(features)
-
-    labels = np.concatenate(labels)
-
-    return features,labels
 
 
 
@@ -123,51 +92,109 @@ dloader_test = DataLoader(
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
 PATH = "bownet_checkpoint"
 checkpoint = torch.load(PATH)
 
-bownet,optimizer,epoch,loss = load_checkpoint(checkpoint,device)
-criterion = nn.CrossEntropyLoss().to(device)
+bownet,_,_,_ = load_checkpoint(checkpoint,device)
 
-classifier =
+
+classifier = LinearClassifier(100).to(device)
+num_epochs = 20
+
+criterion = nn.CrossEntropyLoss().to(device)
+optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9,weight_decay= 5e-4)
 
 
 with torch.cuda.device(0):
     for para in bownet.parameters():
         para.requires_grad = False
-    # for epoch in range(num_epochs):  # loop over the dataset multiple times
+    for epoch in range(num_epochs):  # loop over the dataset multiple times
 
-    print()
-    print("TRAINING")
-    running_loss = 0.0
-    loss_100 = 0.0
+        print()
+        print("TRAINING")
+        running_loss = 0.0
+        loss_100 = 0.0
 
-    print("number of batch: ",len(dloader_train))
+        print("number of batch: ",len(dloader_train))
+        start_epoch = time.time()
+        accs = []
 
-    accs = []
+        # for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
+        for idx, batch in enumerate(dloader_train(epoch)):
 
-    feature_train, labels = get_feature_map(bownet,dloader_train)
+            start_time = time.time()
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = batch
 
-
-    print(feature_train.shape)
-    print(labels.shape)
-
-    feature_train = feature_train.reshape((feature_train.shape[0],-1))
-
-    print(feature_train.shape)
+            # check_input = inputs[0].permute(1, 2, 0)
 
 
-    # clf = LinearSVC(random_state=0, tol=1e-5)
-    print("Run K-means")
-    # cluster_ids_x, cluster_centers = kmeans(X=feature_train, num_clusters=200, distance='euclidean', device=torch.device('cuda:0'))
-    #
-    # clf.fit(feature_train,labels)
-    sk_kmeans = KMeans(n_clusters=2048,max_iter=20, tol=0.0001).fit(feature_train)
+            #Load data to GPU
+            inputs, labels = inputs.cuda(), labels.cuda()
 
-    # kmeans = MiniBatchKMeans(n_clusters=2048,random_state=0,batch_size=128,max_iter=20,verbose=1).fit(feature_train)
-    print(sk_kmeans.cluster_centers_.shape)
+            bownet(inputs)
+            conv_out = bownet.resblock3_256b_fmaps
 
-    # print(kmeans.cluster_centers_.shape)
+            # print(conv_out.shape)
+
+
+
+
+            time_load_data = time.time() - start_time
+
+            # print(labels)
+
+
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            # forward + backward + optimize
+            logits, preds = classifier(conv_out)
+
+            print(preds.shape)
+
+            # print(preds[:,0])
+
+            #Compute loss
+            loss = criterion(preds[:,0], labels)
+
+            print(loss.item())
+
+
+
+
+            #Back Prop and Optimize
+            loss.backward()
+            optimizer.step()
+
+            # print statistics
+            running_loss += loss.item()
+
+            loss_100 += loss.item()
+
+            accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
+
+            # accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
+
+
+            if idx % 100 == 99:
+                print('[%d, %5d] loss: %.3f' %
+                      (epoch , idx, loss_100/100))
+                loss_100 = 0.0
+                # acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
+                # print("accuracy 100 batch: ",acc)
+                # print("Time to finish 100 batch", time.time() - start_time)
+
+        # plt.imshow(check_input)
+        # plt.savefig("imag" + str(epoch) + ".png")
+        # accs = np.array(accs)
+        # print("epoch training accuracy: ",accs.mean())
+        #
+        # print("Time to load the data", time_load_data)
+        # print("Time to finish an epoch ", time.time() - start_epoch)
+        # print('[%d, %5d] epoches loss: %.3f' %
+        #       (epoch, len(dloader_train), running_loss / len(dloader_train)))
 
     # print("EVALUATION")
     #
