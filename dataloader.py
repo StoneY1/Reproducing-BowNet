@@ -70,22 +70,17 @@ class GenericDataset(data.Dataset):
             raise ValueError('The random size crop option is not supported for the CIFAR dataset')
 
         transform = []
-        my_transformations = transforms.Compose([
-            transforms.ColorJitter(brightness=0, contrast=0, saturation=0, hue=0),
-            transforms.RandomGrayscale(p=0.1),
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomResizedCrop(32, scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
-            transforms.RandomHorizontalFlip()
-        ])
+
         if (split != 'test'): #If load training data, the perform augmentation
             # transform.append(transforms.RandomCrop(32, padding=4))
-            # transform.append(transforms.RandomHorizontalFlip())
-            transform.append(lambda x: np.asarray(x))
-            # self.transform = transforms.Compose(transform)
-            self.transform = transforms.Compose(my_transformations)
-            self.data = datasets.__dict__[self.dataset_name.upper()](
-                _CIFAR_DATASET_DIR, train=self.split=='train',
-                download=True, transform=self.transform)
+            transform.append(transforms.RandomHorizontalFlip())
+
+        transform.append(lambda x: np.asarray(x))
+
+        self.transform = transforms.Compose(transform)
+        self.data = datasets.__dict__[self.dataset_name.upper()](
+            _CIFAR_DATASET_DIR, train=self.split=='train',
+            download=True, transform=self.transform)
 
         if num_imgs_per_cat is not None:
             self._keep_first_k_examples_per_category(num_imgs_per_cat)
@@ -172,10 +167,25 @@ class DataLoader(object):
 
         mean_pix  = self.dataset.mean_pix
         std_pix   = self.dataset.std_pix
-        self.transform = transforms.Compose([
+
+        my_transformations = [
+            transforms.ToPILImage(),
+            transforms.ColorJitter(brightness=0, contrast=0, saturation=0, hue=0),
+            transforms.RandomGrayscale(p=0.1),
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomResizedCrop(32, scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
+            transforms.RandomHorizontalFlip(),
             transforms.ToTensor()
-            # transforms.Normalize(mean=mean_pix, std=std_pix)
-        ])
+        ]
+
+        if self.unsupervised:
+            self.transform = transforms.Compose([
+                transforms.ToTensor()
+                # transforms.Normalize(mean=mean_pix, std=std_pix)
+            ])
+        else:
+            print("Compse transofrom supervised mode")
+            self.transform = transforms.Compose(my_transformations)
         self.inv_transform = transforms.Compose([
             Denormalize(mean_pix, std_pix),
             lambda x: x.numpy() * 255.0,
@@ -213,6 +223,7 @@ class DataLoader(object):
                 batch[1] = batch[1].view([batch_size*rotations])
                 return batch
         else: # supervised mode
+            print("get iterator supervised mode")
             # if in supervised mode define a loader function that given the
             # index of an image it returns the image and its categorical label
             def _load_function(idx):

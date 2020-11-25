@@ -12,7 +12,7 @@ batch_size = 128
 
 data_train_opt = {}
 data_train_opt['batch_size'] = batch_size
-data_train_opt['unsupervised'] = True
+data_train_opt['unsupervised'] = False
 data_train_opt['epoch_size'] = None
 data_train_opt['random_sized_crop'] = False
 data_train_opt['dataset_name'] = 'cifar100'
@@ -20,7 +20,7 @@ data_train_opt['split'] = 'train'
 
 data_test_opt = {}
 data_test_opt['batch_size'] = batch_size
-data_test_opt['unsupervised'] = True
+data_test_opt['unsupervised'] = False
 data_test_opt['epoch_size'] = None
 data_test_opt['random_sized_crop'] = False
 data_test_opt['dataset_name'] = 'cifar100'
@@ -72,10 +72,10 @@ if __name__ == "__main__":
       # if i == 10:
       #     break
 
-    bownet = model.BowNet(num_classes=100)
-    #test_tensor = torch.transpose(torch.randn((50000, 32, 32, 3)), 1, 3)
-    test_tensor = data
-    test_logits, test_pred = bownet(test_tensor)
-
-    print(test_logits)
-    print(test_pred)
+    # bownet = model.BowNet(num_classes=100)
+    # #test_tensor = torch.transpose(torch.randn((50000, 32, 32, 3)), 1, 3)
+    # test_tensor = data
+    # test_logits, test_pred = bownet(test_tensor)
+    #
+    # print(test_logits)
+    # print(test_pred)

@@ -17,6 +17,10 @@ import numpy as np
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression
 
+from sklearn.cluster import KMeans
+from sklearn.cluster import MiniBatchKMeans
+from kmeans_pytorch import kmeans
+
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
 
@@ -123,16 +127,12 @@ PATH = "bownet_checkpoint"
 checkpoint = torch.load(PATH)
 
 bownet,optimizer,epoch,loss = load_checkpoint(checkpoint,device)
-
 criterion = nn.CrossEntropyLoss().to(device)
 
 
 with torch.cuda.device(0):
     for para in bownet.parameters():
         para.requires_grad = False
-
-
-
     # for epoch in range(num_epochs):  # loop over the dataset multiple times
 
     print()
@@ -154,55 +154,64 @@ with torch.cuda.device(0):
 
     print(feature_train.shape)
 
-    clf = LinearSVC(random_state=0, tol=1e-5)
 
-    clf.fit(feature_train,labels)
+    # clf = LinearSVC(random_state=0, tol=1e-5)
+    print("Run K-means")
+    # cluster_ids_x, cluster_centers = kmeans(X=feature_train, num_clusters=200, distance='euclidean', device=torch.device('cuda:0'))
+    #
+    # clf.fit(feature_train,labels)
+    sk_kmeans = KMeans(n_clusters=2048,max_iter=20, tol=0.0001).fit(feature_train)
 
-    print("EVALUATION")
+    # kmeans = MiniBatchKMeans(n_clusters=2048,random_state=0,batch_size=128,max_iter=20,verbose=1).fit(feature_train)
+    print(sk_kmeans.cluster_centers_.shape)
 
-    print("number of batch: ",len(dloader_test))
+    # print(kmeans.cluster_centers_.shape)
 
-    running_loss = 0.0
-    accs = []
-    for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
-        start_time = time.time()
-        # get the inputs; data is a list of [inputs, labels]
-        inputs, labels = batch
-
-        #Load data to GPU
-        inputs, labels = inputs.cuda(), labels.cuda()
-        time_load_data = time.time() - start_time
-
-
-        # forward + backward + optimize
-
-
-        logits, preds = bownet(inputs)
-
-        feature_test = bownet.resblock3_256b_fmaps
-
-        print(x.shape)
-
-        # print(preds[:,0])
-
-        #Compute loss
-        loss = criterion(preds[:,0], labels)
-
-
-        # print statistics
-        running_loss += loss.item()
-
-        accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
-
-
-
-
-    # plt.imshow(check_input)
-    # plt.savefig("imag" + str(epoch) + ".png")
-    accs = np.array(accs)
-    print("epoche test accuracy: ",accs.mean())
-
-    print("Time to load the data", time_load_data)
-    print("Time to finish an epoch ", time.time() - start_epoch)
-    print('[%d, %5d] epoches loss: %.3f' %
-          (epoch, len(dloader_test), running_loss / len(dloader_test)))
+    # print("EVALUATION")
+    #
+    # print("number of batch: ",len(dloader_test))
+    #
+    # running_loss = 0.0
+    # accs = []
+    # for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
+    #     start_time = time.time()
+    #     # get the inputs; data is a list of [inputs, labels]
+    #     inputs, labels = batch
+    #
+    #     #Load data to GPU
+    #     inputs, labels = inputs.cuda(), labels.cuda()
+    #     time_load_data = time.time() - start_time
+    #
+    #
+    #     # forward + backward + optimize
+    #
+    #
+    #     logits, preds = bownet(inputs)
+    #
+    #     feature_test = bownet.resblock3_256b_fmaps
+    #
+    #     print(x.shape)
+    #
+    #     # print(preds[:,0])
+    #
+    #     #Compute loss
+    #     loss = criterion(preds[:,0], labels)
+    #
+    #
+    #     # print statistics
+    #     running_loss += loss.item()
+    #
+    #     accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
+    #
+    #
+    #
+    #
+    # # plt.imshow(check_input)
+    # # plt.savefig("imag" + str(epoch) + ".png")
+    # accs = np.array(accs)
+    # print("epoche test accuracy: ",accs.mean())
+    #
+    # print("Time to load the data", time_load_data)
+    # print("Time to finish an epoch ", time.time() - start_epoch)
+    # print('[%d, %5d] epoches loss: %.3f' %
+    #       (epoch, len(dloader_test), running_loss / len(dloader_test)))
