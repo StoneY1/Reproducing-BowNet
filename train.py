@@ -37,7 +37,7 @@ def train_rotation():
 
             # forward + backward + optimize
             logits, preds = bownet(inputs)
-            loss = criterion(preds, labels)
+            loss = criterion(logits, labels)
             loss.backward()
             optimizer.step()
 

@@ -157,7 +157,7 @@ with torch.cuda.device(0):
             # print(preds[:,0])
 
             #Compute loss
-            loss = criterion(preds[:,0], labels)
+            loss = criterion(logits, labels)
 
             print(loss.item())
 
