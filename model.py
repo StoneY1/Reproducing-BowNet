@@ -36,10 +36,34 @@ class ResidualBlock(nn.Module):
         x = F.relu(residual + x)
         return x
 
+class NormalizedLinear(nn.Module):
+    """Normalized linear layer with scalar as described in paper.
+    Behaves like a regular Linear/Fully Connected layer except we now need to multiply by a learnable scale
+    """
+    def __init__(self, in_features, out_features):
+        super().__init__()
+        self.c_in = in_features
+        self.c_out = out_features
+        self.init_limit = np.sqrt(6/(self.c_in + self.c_out))
+        
+        # Initialize all relevant paramters. Weight tensor, normalized weight, gamma scalar
+        self.weight = nn.Parameter(torch.Tensor(self.c_out, self.c_in))
+        self.weight.data.uniform_(-self.init_limit, self.init_limit) # Classic GlorotUniform initialization
+        self.normed_weight = self.weight/torch.linalg.norm(self.weight)
+        self.gamma = nn.Parameter(torch.Tensor(1,1)).data.normal()
+
+        # Based on equation in paper, this layer has no bias parameters
+        self.register_parameter('bias', None)
+
+    def forward(self, input_tensor):
+        x = F.linear(input_tensor, self.normed_weight, self.bias)
+        x *= self.gamma
+        return x
+
 class BowNet(nn.Module):
     """Class definition for our BowNet CNN. This arch is used for both the RotNet pretraining and the BowNet encoder.
     We use a straightforward ResNet18-like architecture with some slight modifications for CIFAR-100's 32x32 input resolution."""
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, bow_training=False):
         """Define layers"""
         super().__init__()
         self.num_classes = num_classes
@@ -56,7 +80,10 @@ class BowNet(nn.Module):
         self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
 
         self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
-        self.fc_out = nn.Linear(512, self.num_classes)
+        if bow_training:
+            self.fc_out = NormalizedLinear(512, self.num_classes)
+        else:
+            self.fc_out = nn.Linear(512, self.num_classes)
         # self.fc_out = nn.Linear(512,1)
 
     def forward(self, input_tensor):
@@ -81,6 +108,7 @@ class BowNet(nn.Module):
         logits = x
         # print("bownet x shape", x.shape)
         preds = F.softmax(x, dim=-1)
+        import pdb; pdb.set_trace()
 
         return logits, preds
 
@@ -124,7 +152,6 @@ class LinearClassifier(nn.Module):
         # # print(x.shape)
         # x = self.fc2(x)
 
-
         x = x.reshape(-1, 1, 100)
 
         logits = x
@@ -154,8 +181,11 @@ def load_checkpoint(checkpoint,device):
     return bownet, optimizer, epoch, loss
 
 if __name__ == "__main__":
-    bownet = BowNet(num_classes=100)
+    bownet = BowNet(num_classes=100, bow_training=True)
+    #linear = LinearClassifier(num_classes=100)
     #test_tensor = torch.transpose(torch.randn((50000, 32, 32, 3)), 1, 3)
-    test_tensor = torch.transpose(torch.randn((5, 32, 32, 3)), 1, 3)
+    test_tensor = torch.transpose(torch.randn((2, 32, 32, 3)), 1, 3)
+    #test_tensor = torch.randn((1, 256, 8, 8))
 
     test_logits, test_preds = bownet(test_tensor)
+    #test_logits, test_preds = linear(test_tensor)

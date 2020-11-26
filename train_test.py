@@ -54,8 +54,6 @@ def accuracy(output, target, topk=(1,)):
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
-
-
 dataset_train = GenericDataset(
     dataset_name=data_train_opt['dataset_name'],
     split=data_train_opt['split'],
@@ -131,7 +129,7 @@ with torch.cuda.device(0):
             # print(preds[:,0])
 
             #Compute loss
-            loss = criterion(preds[:,0], labels)
+            loss = criterion(logits, labels)
 
 
             #Back Prop and Optimize
@@ -152,6 +150,7 @@ with torch.cuda.device(0):
                 acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
                 print("accuracy 100 batch: ",acc)
                 print("Time to finish 100 batch", time.time() - start_time)
+
 
         # plt.imshow(check_input)
         # plt.savefig("imag" + str(epoch) + ".png")

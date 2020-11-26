@@ -64,7 +64,6 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
             # The authors propose densely sampling feature C-dimensional feature vectors at each
             # spatial location where C is the size of the channel dimension. These feature vectors are used for the KMeans clustering
             outputs = bownet(inputs)
-            # TODO need to verify that bownet.resblock3_256b_fmaps is actually getting updated after calling bownet.forward()
             resblock3_fmaps = bownet.resblock3_256b_fmaps
             resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[1])
             feature_vectors_list.extend(resblock3_feature_vectors)
@@ -85,3 +84,40 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
     return sk_kmeans, rotnet_vocab
 
 # TODO Need to implement the histogram creation. maybe
+
+def train_bow_reconstruction(K: int=2048):
+    """Main training method presented in the paper. 
+    Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
+# Just writing pseudo-code for now
+    num_epochs = 200
+
+    # Now for actual BoW training, output is equal to K
+    bownet = BowNet(num_classes=K, bow_training=True)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(bownet.parameters(), lr=0.001, momentum=0.9)
+    for epoch in range(num_epochs):  # loop over the dataset multiple times
+
+        running_loss = 0.0
+        for i, data in enumerate(dloader_train, 0):
+            # get the inputs; data is a list of [inputs, labels]
+            # labels are now the expected BOW histogram rather than class label
+            inputs, labels = data
+
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            # forward + backward + optimize
+            logits, preds = bownet(inputs)
+            loss = criterion(logits, labels)
+            loss.backward()
+            optimizer.step()
+
+            # print statistics
+            running_loss += loss.item()
+            if i % 2000 == 1999:    # print every 2000 mini-batches
+                print('[%d, %5d] loss: %.3f' %
+                      (epoch + 1, i + 1, running_loss / 2000))
+                running_loss = 0.0
+
+    print('Finished Training')
+    return
