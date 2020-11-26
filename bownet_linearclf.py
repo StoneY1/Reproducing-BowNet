@@ -100,15 +100,17 @@ bownet,_,_,_ = load_checkpoint(checkpoint,device)
 
 
 classifier = LinearClassifier(100).to(device)
-num_epochs = 20
+num_epochs = 200
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9,weight_decay= 5e-4)
+optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
+lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.2)
 
+for para in bownet.parameters():
+    para.requires_grad = False
 
 with torch.cuda.device(0):
-    for para in bownet.parameters():
-        para.requires_grad = False
+
     for epoch in range(num_epochs):  # loop over the dataset multiple times
 
         print()
@@ -120,6 +122,7 @@ with torch.cuda.device(0):
         start_epoch = time.time()
         accs = []
 
+        true_count = 0.0
         # for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
         for idx, batch in enumerate(dloader_train(epoch)):
 
@@ -152,40 +155,52 @@ with torch.cuda.device(0):
             # forward + backward + optimize
             logits, preds = classifier(conv_out)
 
-            print(preds.shape)
-
             # print(preds[:,0])
 
             #Compute loss
+            predicts = torch.argmax(preds[:,0], dim=1)
+            # predicts = predicts.reshape(1,-1)
+            # print(labels.shape)
+            # print(predicts.shape)
+            # print(preds[:,0].shape)
             loss = criterion(preds[:,0], labels)
-
-            print(loss.item())
-
-
 
 
             #Back Prop and Optimize
             loss.backward()
             optimizer.step()
 
+            # print(classifier.fc1_out.weight.grad)
+
             # print statistics
             running_loss += loss.item()
 
             loss_100 += loss.item()
 
-            accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
+            # print(torch.argmax(preds[:,0], dim=1))
+            # print(labels)
+            #
+            # print((predicts == labels).float().sum())
+            # print(predicts)
+            # print(labels)
+
+            # accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
 
             # accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
+            # acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
+            # print("accuracy 100 batch: ",acc)
+            true_count += ((predicts == labels).float().sum()).cpu().numpy()
 
 
             if idx % 100 == 99:
                 print('[%d, %5d] loss: %.3f' %
                       (epoch , idx, loss_100/100))
                 loss_100 = 0.0
-                # acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
-                # print("accuracy 100 batch: ",acc)
-                # print("Time to finish 100 batch", time.time() - start_time)
-
+                # acc = (((predicts == labels).float().sum())/128).cpu().numpy()
+                # print("accuracy after 100 batch: ",acc)
+                print("Time to finish 100 batch", time.time() - start_time)
+        lr_scheduler.step()
+        print("epoch acc ", true_count/len(dloader_train.dataset))
         # plt.imshow(check_input)
         # plt.savefig("imag" + str(epoch) + ".png")
         # accs = np.array(accs)
