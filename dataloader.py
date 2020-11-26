@@ -169,12 +169,12 @@ class DataLoader(object):
         std_pix   = self.dataset.std_pix
 
         my_transformations = [
-            transforms.ToPILImage(),
-            transforms.ColorJitter(brightness=0, contrast=0, saturation=0, hue=0),
-            transforms.RandomGrayscale(p=0.1),
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomResizedCrop(32, scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
-            transforms.RandomHorizontalFlip(),
+            # transforms.ToPILImage(),
+            # transforms.ColorJitter(brightness=0, contrast=0, saturation=0, hue=0),
+            # transforms.RandomGrayscale(p=0.1),
+            # transforms.RandomCrop(32, padding=4),
+            # transforms.RandomResizedCrop(32, scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
+            # transforms.RandomHorizontalFlip(),
             transforms.ToTensor()
         ]
 

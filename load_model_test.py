@@ -223,7 +223,7 @@ with torch.cuda.device(0):
     print("Time to finish an epoch ", time.time() - start_epoch)
     print('[%d, %5d] epoches loss: %.3f' %
           (epoch, len(dloader_test), running_loss / len(dloader_test)))
-    print(preds.data)
+    print(torch.argmax(preds[:,0],dim=1))
     print(labels)
 
 

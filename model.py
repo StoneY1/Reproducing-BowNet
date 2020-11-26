@@ -91,13 +91,38 @@ class LinearClassifier(nn.Module):
         """Define layers"""
         super().__init__()
         self.num_classes = num_classes
-        self.fc_out = nn.Linear(16384,self.num_classes)
+        self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
+        self.adaptive_max_pool = nn.AdaptiveAvgPool2d((5,5))
+        self.batch_norm = nn.BatchNorm2d(256)
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(6400,self.num_classes)
+        self.fc2 = nn.Linear(1000,self.num_classes)
+
+        self.initilize()
 
 
     def forward(self, input_tensor):
-        x = input_tensor.view(input_tensor.size(0), -1)
+        # x = input_tensor.view(input_tensor.size(0), -1)
+        # x = self.global_avg_pool(input_tensor)
+        x = self.adaptive_max_pool(input_tensor)
+        # print("adaptive",x.shape)
 
-        x = self.fc_out(x)
+        x = self.batch_norm(x)
+
+        # print("batch_norm ",x.shape)
+
+        x = self.flatten(x)
+        # print("flatten: ",x.shape)
+        #
+        # x= x.reshape(-1, 256)
+        # x = input_tensor.view(-1, 16384)
+        # print(x.shape)
+        # x = F.relu(x)
+        x = self.fc1(x)
+        # print("fc1_out: ",x.shape)
+        # x = F.relu(x)
+        # # print(x.shape)
+        # x = self.fc2(x)
 
 
         x = x.reshape(-1, 1, 100)
@@ -106,6 +131,16 @@ class LinearClassifier(nn.Module):
         preds = F.softmax(x, dim=-1)
 
         return logits, preds
+
+    def initilize(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                fin = m.in_features
+                fout = m.out_features
+                std_val = np.sqrt(2.0 / fout)
+                m.weight.data.normal_(0.0, std_val)
+                if m.bias is not None:
+                    m.bias.data.fill_(0.0)
 
 def load_checkpoint(checkpoint,device):
     bownet = BowNet(num_classes=4).to(device)
