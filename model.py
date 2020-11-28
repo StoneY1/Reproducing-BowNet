@@ -49,8 +49,9 @@ class NormalizedLinear(nn.Module):
         # Initialize all relevant paramters. Weight tensor, normalized weight, gamma scalar
         self.weight = nn.Parameter(torch.Tensor(self.c_out, self.c_in))
         self.weight.data.uniform_(-self.init_limit, self.init_limit) # Classic GlorotUniform initialization
-        self.normed_weight = self.weight/torch.linalg.norm(self.weight)
-        self.gamma = nn.Parameter(torch.Tensor(1,1)).data.normal()
+        self.normed_weight = self.weight/torch.norm(self.weight)
+        self.gamma = nn.Parameter(torch.Tensor(1,1))
+        self.gamma.data.normal_()
 
         # Based on equation in paper, this layer has no bias parameters
         self.register_parameter('bias', None)
@@ -108,9 +109,63 @@ class BowNet(nn.Module):
         logits = x
         # print("bownet x shape", x.shape)
         preds = F.softmax(x, dim=-1)
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
 
         return logits, preds
+
+class BowNet2(nn.Module):
+    """Class definition for our BowNet CNN. This arch is used for both the RotNet pretraining and the BowNet encoder.
+    We use a straightforward ResNet18-like architecture with some slight modifications for CIFAR-100's 32x32 input resolution."""
+    def __init__(self, num_classes, bow_training=False):
+        """Define layers"""
+        super().__init__()
+        self.num_classes = num_classes
+        self.conv1_64 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=7, stride=2, padding=1)
+        self.bn1_64 = nn.BatchNorm2d(num_features=64)
+
+        self.resblock1_64a = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=1)
+        self.resblock1_64b = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=1)
+        self.resblock2_128a = ResidualBlock(in_channels=64, out_channels=128, kernel_size=3, downsample_factor=2)
+        self.resblock2_128b = ResidualBlock(in_channels=128, out_channels=128, kernel_size=3, downsample_factor=1)
+        self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2)
+        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1)
+        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1)
+        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
+
+        self.global_avg_pool = nn.AvgPool2d(kernel_size=4, stride=1)
+        if bow_training:
+            self.fc_out = NormalizedLinear(512, self.num_classes)
+        else:
+            self.fc_out = nn.Linear(512, self.num_classes)
+        # self.fc_out = nn.Linear(512,1)
+
+    def forward(self, input_tensor):
+        """Forward pass of our BowNet-lite"""
+
+        x = F.relu(self.bn1_64(self.conv1_64(input_tensor)))
+        x = self.resblock1_64a(x)
+        x = self.resblock1_64b(x)
+        x = self.resblock2_128a(x)
+        x = self.resblock2_128b(x)
+        x = self.resblock3_256a(x)
+        x = self.resblock3_256b(x)
+
+        # We will need these feature maps for the K-means clustering to create a Visual BoW vocabulary
+        self.resblock3_256b_fmaps = x
+
+        x = self.resblock4_512a(x)
+        x = self.resblock4_512b(x)
+
+        x = self.global_avg_pool(x).reshape(-1, 1, 512)
+        x = self.fc_out(x)
+        logits = x
+        # print("bownet x shape", x.shape)
+        preds = F.softmax(x, dim=-1)
+        #import pdb; pdb.set_trace()
+
+        return logits, preds
+
+
 
 
 class LinearClassifier(nn.Module):

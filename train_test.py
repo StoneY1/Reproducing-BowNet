@@ -8,7 +8,8 @@ import imp
 from dataloader import DataLoader, GenericDataset
 import matplotlib.pyplot as plt
 
-from model import BowNet
+#from model import BowNet
+from model import BowNet2 as BowNet
 from tqdm import tqdm
 import torch
 import torch.nn as nn
