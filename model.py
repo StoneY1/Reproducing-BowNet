@@ -9,71 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
-class ResidualBlock(nn.Module):
-    """Basic 2-layer residual block as described in the original ResNet paper https://arxiv.org/abs/1512.03385"""
-    def __init__(self, in_channels, out_channels, kernel_size, downsample_factor):
-        super().__init__()
-        self.c_in = in_channels
-        self.c_out = out_channels
-        self.ksize = kernel_size
-        self.ds_factor = downsample_factor
-        self.dims_match = self.c_out == self.c_in and self.ds_factor == 1
-        self.conv1 = nn.Conv2d(in_channels=self.c_in, out_channels=self.c_out, kernel_size=self.ksize, stride=self.ds_factor, padding=self.ksize//2)
-        self.bn1 = nn.BatchNorm2d(num_features=self.c_out)
-        self.conv2 = nn.Conv2d(in_channels=self.c_out, out_channels=self.c_out, kernel_size=self.ksize, stride=1, padding=self.ksize//2)
-        self.bn2 = nn.BatchNorm2d(num_features=self.c_out)
-        if not self.dims_match:
-            self.dims_projecting_conv = nn.Conv2d(in_channels=self.c_in, out_channels=self.c_out, kernel_size=1, stride=self.ds_factor)
-
-        self.initialize()
-
-    def forward(self, input_tensor):
-        """Forward pass of this block"""
-        x = self.bn1(self.conv1(input_tensor))
-        x = F.relu(x)
-        x = self.bn2(self.conv2(x))
-        x = F.relu(x)
-        residual = input_tensor if self.dims_match else self.dims_projecting_conv(input_tensor)
-        x = F.relu(residual + x)
-        return x
-    
-    def initialize(self):
-        for m in self._modules:
-            block = self._modules[m]
-            if not isinstance(block, nn.Conv2d):
-                continue
-            fin = block.in_channels
-            fout = block.out_channels
-            limit = np.sqrt(6.0 / (fout + fin))
-            block.weight.data.uniform_(-limit, limit)
-            if block.bias is not None:
-                block.bias.data.fill_(0.0)
-
-class NormalizedLinear(nn.Module):
-    """Normalized linear layer with scalar as described in paper.
-    Behaves like a regular Linear/Fully Connected layer except we now need to multiply by a learnable scale
-    """
-    def __init__(self, in_features, out_features):
-        super().__init__()
-        self.c_in = in_features
-        self.c_out = out_features
-        self.init_limit = np.sqrt(6/(self.c_in + self.c_out))
-        
-        # Initialize all relevant paramters. Weight tensor, normalized weight, gamma scalar
-        self.weight = nn.Parameter(torch.Tensor(self.c_out, self.c_in))
-        self.weight.data.uniform_(-self.init_limit, self.init_limit) # Classic GlorotUniform initialization
-        self.normed_weight = self.weight/torch.norm(self.weight)
-        self.gamma = nn.Parameter(torch.Tensor(1,1))
-        self.gamma.data.fill_(1.0)
-
-        # Based on equation in paper, this layer has no bias parameters
-        self.register_parameter('bias', None)
-
-    def forward(self, input_tensor):
-        x = F.linear(input_tensor, self.normed_weight, self.bias)
-        x *= self.gamma
-        return x
+from layers import ResidualBlock, NormalizedLinear
 
 class BowNet(nn.Module):
     """Class definition for our BowNet CNN. This arch is used for both the RotNet pretraining and the BowNet encoder.
@@ -84,15 +20,16 @@ class BowNet(nn.Module):
         self.num_classes = num_classes
         self.conv1_64 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.bn1_64 = nn.BatchNorm2d(num_features=64)
+        self.relu1_64 = nn.ReLU()
 
         self.resblock1_64a = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=2)
         self.resblock1_64b = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=1)
         self.resblock2_128a = ResidualBlock(in_channels=64, out_channels=128, kernel_size=3, downsample_factor=1)
         self.resblock2_128b = ResidualBlock(in_channels=128, out_channels=128, kernel_size=3, downsample_factor=1)
-        self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2)
-        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1)
-        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1)
-        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
+        self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2, use_dropout=True, dropout_rate=0.3)
+        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.3)
+        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.5)
+        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.5)
 
         self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
         if bow_training:
@@ -105,7 +42,7 @@ class BowNet(nn.Module):
     def forward(self, input_tensor):
         """Forward pass of our BowNet-lite"""
 
-        x = F.relu(self.bn1_64(self.conv1_64(input_tensor)))
+        x = self.relu1_64(self.bn1_64(self.conv1_64(input_tensor)))
         x = self.resblock1_64a(x)
         x = self.resblock1_64b(x)
         x = self.resblock2_128a(x)
@@ -132,8 +69,8 @@ class BowNet(nn.Module):
             block = self._modules[m]
             if not isinstance(block, (nn.Linear, nn.Conv2d)):
                 continue
-            fin = block.in_features if isinstance(block, nn.Linear) else block.in_channels
-            fout = block.out_features if isinstance(block, nn.Linear) else block.out_channels
+            fin = block.in_features if isinstance(block, nn.Linear) else block.in_channels * np.prod(block.kernel_size)
+            fout = block.out_features if isinstance(block, nn.Linear) else block.out_channels * np.prod(block.kernel_size)
             limit = np.sqrt(6.0 / (fout + fin))
             block.weight.data.uniform_(-limit, limit)
             if block.bias is not None:
@@ -148,6 +85,7 @@ class BowNet2(nn.Module):
         self.num_classes = num_classes
         self.conv1_64 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=7, stride=1, padding=3)
         self.bn1_64 = nn.BatchNorm2d(num_features=64)
+        self.relu1_64 = nn.ReLU()
         self.maxpool_1 = nn.MaxPool2d(kernel_size=(2,2))
 
         self.resblock1_64a = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=1)
@@ -172,7 +110,7 @@ class BowNet2(nn.Module):
     def forward(self, input_tensor):
         """Forward pass of our BowNet-lite"""
 
-        x = F.relu(self.bn1_64(self.conv1_64(input_tensor)))
+        x = self.relu1_64(self.bn1_64(self.conv1_64(input_tensor)))
         x = self.maxpool_1(x)
         x = self.resblock1_64a(x)
         x = self.resblock1_64b(x)
@@ -210,8 +148,8 @@ class BowNet2(nn.Module):
             block = self._modules[m]
             if not isinstance(block, (nn.Linear, nn.Conv2d)):
                 continue
-            fin = block.in_features if isinstance(block, nn.Linear) else block.in_channels
-            fout = block.out_features if isinstance(block, nn.Linear) else block.out_channels
+            fin = block.in_features if isinstance(block, nn.Linear) else block.in_channels * np.prod(block.kernel_size)
+            fout = block.out_features if isinstance(block, nn.Linear) else block.out_channels * np.prod(block.kernel_size)
             limit = np.sqrt(6.0 / (fout + fin))
             block.weight.data.uniform_(-limit, limit)
             if block.bias is not None:
@@ -226,6 +164,7 @@ class BowNet3(nn.Module):
         self.num_classes = num_classes
         self.conv1_64 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=7, stride=1, padding=3)
         self.bn1_64 = nn.BatchNorm2d(num_features=64)
+        self.relu1_64 = nn.ReLU()
         self.maxpool_1 = nn.MaxPool2d(kernel_size=(2,2))
 
         self.resblock1_64a = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=1)
@@ -254,7 +193,7 @@ class BowNet3(nn.Module):
     def forward(self, input_tensor):
         """Forward pass of our BowNet-lite"""
 
-        x = F.relu(self.bn1_64(self.conv1_64(input_tensor)))
+        x = self.relu1_64(self.bn1_64(self.conv1_64(input_tensor)))
         x = self.maxpool_1(x)
         x = self.resblock1_64a(x)
         x = self.resblock1_64b(x)
@@ -294,8 +233,8 @@ class BowNet3(nn.Module):
             block = self._modules[m]
             if not isinstance(block, (nn.Linear, nn.Conv2d)):
                 continue
-            fin = block.in_features if isinstance(block, nn.Linear) else block.in_channels
-            fout = block.out_features if isinstance(block, nn.Linear) else block.out_channels
+            fin = block.in_features if isinstance(block, nn.Linear) else block.in_channels * np.prod(block.kernel_size)
+            fout = block.out_features if isinstance(block, nn.Linear) else block.out_channels * np.prod(block.kernel_size)
             limit = np.sqrt(6.0 / (fout + fin))
             block.weight.data.uniform_(-limit, limit)
             if block.bias is not None:
@@ -374,8 +313,11 @@ class NonLinearClassifier(nn.Module):
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(self.input_vector_len, 200)
         self.bn1 = nn.BatchNorm1d(200)
+        self.relu1 = nn.ReLU()
+
         self.fc2 = nn.Linear(200, 200)
         self.bn2 = nn.BatchNorm1d(200)
+        self.relu2 = nn.ReLU()
 
         self.fc_out = nn.Linear(200, self.num_classes)
 
@@ -384,8 +326,8 @@ class NonLinearClassifier(nn.Module):
     def forward(self, input_tensor):
 
         x = self.flatten(input_tensor)
-        x = F.relu(self.bn1(self.fc1(x)))
-        x = F.relu(self.bn2(self.fc2(x)))
+        x = self.relu1(self.bn1(self.fc1(x)))
+        x = self.relu2(self.bn2(self.fc2(x)))
 
         x = self.fc_out(x)
 
