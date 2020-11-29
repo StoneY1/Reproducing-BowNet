@@ -12,7 +12,6 @@ import torchvision
 import torchnet as tnt
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
-# from Places205 import Places205
 import numpy as np
 import random
 from torch.utils.data.dataloader import default_collate
@@ -63,8 +62,12 @@ class GenericDataset(data.Dataset):
         ###CIFAR100
 
         #this mean and std is from CIFAR10
-        self.mean_pix = [x/255.0 for x in [125.3, 123.0, 113.9]]
-        self.std_pix = [x/255.0 for x in [63.0, 62.1, 66.7]]
+        #self.mean_pix = [x/255.0 for x in [125.3, 123.0, 113.9]]
+        #self.std_pix = [x/255.0 for x in [63.0, 62.1, 66.7]]
+
+        # For CIFAR-100
+        self.mean_pix = (0.5071, 0.4867, 0.4408)
+        self.std_pix = (0.2675, 0.2565, 0.2761)
 
         if self.random_sized_crop:
             raise ValueError('The random size crop option is not supported for the CIFAR dataset')
@@ -73,8 +76,8 @@ class GenericDataset(data.Dataset):
 
         if (split != 'test'): #If load training data, the perform augmentation
             # transform.append(transforms.RandomCrop(32, padding=4))
-            transform.append(transforms.RandomHorizontalFlip())
-
+            #transform.append(transforms.RandomHorizontalFlip())
+            pass
         transform.append(lambda x: np.asarray(x))
 
         self.transform = transforms.Compose(transform)
@@ -148,7 +151,6 @@ def rotate_img(img, rot):
     else:
         raise ValueError('rotation should be 0, 90, 180, or 270 degrees')
 
-
 class DataLoader(object):
     """If flag is set to unsupervised, will generate the rotations and rotation-labels during training"""
     def __init__(self,
@@ -164,33 +166,46 @@ class DataLoader(object):
         self.batch_size = batch_size
         self.unsupervised = unsupervised
         self.num_workers = num_workers
+        self.split = self.dataset.split
 
         mean_pix  = self.dataset.mean_pix
         std_pix   = self.dataset.std_pix
 
         my_transformations = [
-            # transforms.ToPILImage(),
-            # transforms.ColorJitter(brightness=0, contrast=0, saturation=0, hue=0),
-            # transforms.RandomGrayscale(p=0.1),
-            # transforms.RandomCrop(32, padding=4),
-            # transforms.RandomResizedCrop(32, scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
-            # transforms.RandomHorizontalFlip(),
-            transforms.ToTensor()
+            transforms.ToPILImage(),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
+            transforms.RandomResizedCrop(32, scale=(0.2, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
+            transforms.RandomVerticalFlip(),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean_pix, std=std_pix)
         ]
+        
+        # If testing we won't use any transforms
+        self.passthrough_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean_pix, std=std_pix)
+            ])
 
         if self.unsupervised:
             self.transform = transforms.Compose([
-                transforms.ToTensor()
-                # transforms.Normalize(mean=mean_pix, std=std_pix)
+                transforms.ToTensor(),
+                transforms.Normalize(mean=mean_pix, std=std_pix)
             ])
         else:
             print("Compse transofrom supervised mode")
-            self.transform = transforms.Compose(my_transformations)
-        self.inv_transform = transforms.Compose([
-            Denormalize(mean_pix, std_pix),
-            lambda x: x.numpy() * 255.0,
-            lambda x: x.transpose(1,2,0).astype(np.uint8),
-        ])
+            if self.split == "test":
+                print("Testing set has no transforms")
+                self.transform = self.passthrough_transform
+            else:
+                self.transform = transforms.Compose(my_transformations)
+                self.inv_transform = transforms.Compose([
+                Denormalize(mean_pix, std_pix),
+                lambda x: x.numpy() * 255.0,
+                lambda x: x.transpose(1,2,0).astype(np.uint8),
+                ])
 
     def get_iterator(self, epoch=0):
         # print("get iterator")
