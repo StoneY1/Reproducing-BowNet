@@ -5,7 +5,8 @@ import imp
 from dataloader import DataLoader, GenericDataset
 import matplotlib.pyplot as plt
 
-from model import BowNet, load_checkpoint, LinearClassifier
+from model import BowNet3 as BowNet
+from model import load_checkpoint, LinearClassifier, NonLinearClassifier
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -19,7 +20,7 @@ from sklearn.linear_model import LogisticRegression
 
 from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
-from kmeans_pytorch import kmeans
+#from kmeans_pytorch import kmeans
 
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
@@ -90,21 +91,22 @@ dloader_test = DataLoader(
     shuffle=False)
 
 
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
-PATH = "bownet_checkpoint"
+PATH = "bownet_checkpoint3.pt"
 checkpoint = torch.load(PATH)
 
-bownet,_,_,_ = load_checkpoint(checkpoint,device)
+bownet,_,_,_ = load_checkpoint(checkpoint,device, BowNet)
 
 
-classifier = LinearClassifier(100).to(device)
+classifier = NonLinearClassifier(100, 64, 16).to(device)
+#classifier = LinearClassifier(100, 256, 8).to(device)
 num_epochs = 200
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.2)
+optimizer = optim.SGD(classifier.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-6)
+#optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
+lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
 
 for para in bownet.parameters():
     para.requires_grad = False
@@ -123,6 +125,10 @@ with torch.cuda.device(0):
         accs = []
 
         true_count = 0.0
+        total_count = 0
+        
+        # Need to set bownet to evaluate so that it uses frozen BatchNorm params and no Dropout
+        bownet.evaluate()
         # for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
         for idx, batch in enumerate(dloader_train(epoch)):
 
@@ -137,11 +143,11 @@ with torch.cuda.device(0):
             inputs, labels = inputs.cuda(), labels.cuda()
 
             bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
+            conv_out = bownet.resblock1_64c_fmaps
+            #conv_out = bownet.resblock2_128d_fmaps
+            #conv_out = bownet.resblock3_256f_fmaps
 
             # print(conv_out.shape)
-
-
 
 
             time_load_data = time.time() - start_time
@@ -158,7 +164,7 @@ with torch.cuda.device(0):
             # print(preds[:,0])
 
             #Compute loss
-            loss = criterion(logits, labels)
+            loss = criterion(logits[:, 0], labels)
             predicts = torch.argmax(preds[:,0], dim=1)
             # predicts = predicts.reshape(1,-1)
             # print(labels.shape)
@@ -190,6 +196,7 @@ with torch.cuda.device(0):
             # acc = accuracy(preds[:,0].data, labels, topk=(1,))[0].item()
             # print("accuracy 100 batch: ",acc)
             true_count += ((predicts == labels).float().sum()).cpu().numpy()
+            total_count += predicts.size(0)
 
 
             if idx % 100 == 99:
@@ -200,7 +207,7 @@ with torch.cuda.device(0):
                 # print("accuracy after 100 batch: ",acc)
                 print("Time to finish 100 batch", time.time() - start_time)
         lr_scheduler.step()
-        print("epoch acc ", true_count/len(dloader_train.dataset))
+        print("epoch acc ", 100*true_count/total_count)
         # plt.imshow(check_input)
         # plt.savefig("imag" + str(epoch) + ".png")
         # accs = np.array(accs)
@@ -211,51 +218,61 @@ with torch.cuda.device(0):
         # print('[%d, %5d] epoches loss: %.3f' %
         #       (epoch, len(dloader_train), running_loss / len(dloader_train)))
 
-    # print("EVALUATION")
-    #
-    # print("number of batch: ",len(dloader_test))
-    #
-    # running_loss = 0.0
-    # accs = []
-    # for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
-    #     start_time = time.time()
-    #     # get the inputs; data is a list of [inputs, labels]
-    #     inputs, labels = batch
-    #
-    #     #Load data to GPU
-    #     inputs, labels = inputs.cuda(), labels.cuda()
-    #     time_load_data = time.time() - start_time
-    #
-    #
-    #     # forward + backward + optimize
-    #
-    #
-    #     logits, preds = bownet(inputs)
-    #
-    #     feature_test = bownet.resblock3_256b_fmaps
-    #
-    #     print(x.shape)
-    #
-    #     # print(preds[:,0])
-    #
-    #     #Compute loss
-    #     loss = criterion(preds[:,0], labels)
-    #
-    #
-    #     # print statistics
-    #     running_loss += loss.item()
-    #
-    #     accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
-    #
-    #
-    #
-    #
-    # # plt.imshow(check_input)
-    # # plt.savefig("imag" + str(epoch) + ".png")
-    # accs = np.array(accs)
-    # print("epoche test accuracy: ",accs.mean())
-    #
-    # print("Time to load the data", time_load_data)
-    # print("Time to finish an epoch ", time.time() - start_epoch)
-    # print('[%d, %5d] epoches loss: %.3f' %
-    #       (epoch, len(dloader_test), running_loss / len(dloader_test)))
+        print("EVALUATION")
+        #
+        print("number of batch: ",len(dloader_test))
+        #
+        running_loss = 0.0
+        test_correct = 0 
+        test_total = 0
+        accs = []
+        for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
+            start_time = time.time()
+        #     # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = batch
+        #
+        #     #Load data to GPU
+            inputs, labels = inputs.cuda(), labels.cuda()
+            time_load_data = time.time() - start_time
+        #
+        #
+        #     # forward + backward + optimize
+        #
+        #
+            bownet_outputs = bownet(inputs)
+        #
+            feature_test = bownet.resblock1_64c_fmaps
+            #feature_test = bownet.resblock2_128d_fmaps
+            #feature_test = bownet.resblock3_256f_fmaps
+            logits, preds = classifier(feature_test)
+            predicts = torch.argmax(preds[:,0], dim=1)
+             
+            test_correct += ((predicts == labels).float().sum()).cpu().numpy()
+            test_total += predicts.size(0)
+        #
+        #     print(x.shape)
+        #
+        #     # print(preds[:,0])
+        #
+        #     #Compute loss
+            loss = criterion(logits[:,0], labels)
+        #
+        #
+        #     # print statistics
+            running_loss += loss.item()
+        #
+        #     accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
+        #
+        #
+        #
+        #
+        # # plt.imshow(check_input)
+        # # plt.savefig("imag" + str(epoch) + ".png")
+        # accs = np.array(accs)
+        # print("epoche test accuracy: ",accs.mean())
+        print("epoche test accuracy: ", 100 * test_correct/test_total)
+        #
+        # print("Time to load the data", time_load_data)
+        print("Time to finish an epoch ", time.time() - start_epoch)
+        print('[%d, %5d] epoches loss: %.3f' %
+               (epoch, len(dloader_test), running_loss / len(dloader_test)))
