@@ -71,9 +71,9 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
     '''
 
     # Kmeans using sklearn
-    start = time.time()
-    sk_kmeans = KMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
-    print(f"KMeans takes {time.time() - start}s")
+    #start = time.time()
+    #sk_kmeans = KMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
+    #print(f"KMeans takes {time.time() - start}s")
     start = time.time()
     sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
     print(f"MiniBatchKMeans takes {time.time() - start}s")
@@ -125,4 +125,4 @@ def train_bow_reconstruction(KMeans_vocab, K: int=2048):
 # TODO Need to implement the histogram creation. maybe
 with torch.cuda.device(0):
     sk_kmeans, rotnet_vocab = build_RotNet_vocab(bownet)
-    train_bow_reconstruction(sk_kmeans)
+    train_bow_reconstruction(sk_kmeans, K=2048)
