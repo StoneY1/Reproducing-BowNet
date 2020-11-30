@@ -63,17 +63,7 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
 
     rotnet_feature_vectors = np.array(feature_vectors_list)
     
-    '''
-    # kmeans using pytorch; this package doesn't seem to have a "predict" method
-    cluster_ids_x, cluster_centers = kmeans(
-        X=torch.Tensor(rotnet_feature_vectors).cuda(), num_clusters=K, distance='euclidean', device=torch.device('cuda:0')
-    )
-    '''
-
-    # Kmeans using sklearn
-    start = time.time()
-    sk_kmeans = KMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
-    print(f"KMeans takes {time.time() - start}s")
+    # Using MiniBatchKmeans because regular KMeans is too compute heavy
     start = time.time()
     sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
     print(f"MiniBatchKMeans takes {time.time() - start}s")
@@ -122,7 +112,6 @@ def train_bow_reconstruction(KMeans_vocab, K: int=2048):
     print('Finished Training')
     return
 
-# TODO Need to implement the histogram creation. maybe
 with torch.cuda.device(0):
     sk_kmeans, rotnet_vocab = build_RotNet_vocab(bownet)
-    train_bow_reconstruction(sk_kmeans)
+    train_bow_reconstruction(sk_kmeans, K=2048)

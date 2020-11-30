@@ -26,8 +26,8 @@ class BowNet(nn.Module):
         self.resblock1_64b = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=1)
         self.resblock2_128a = ResidualBlock(in_channels=64, out_channels=128, kernel_size=3, downsample_factor=1)
         self.resblock2_128b = ResidualBlock(in_channels=128, out_channels=128, kernel_size=3, downsample_factor=1)
-        self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2, use_dropout=True, dropout_rate=0.3)
-        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.3)
+        self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2, use_dropout=False, dropout_rate=0.3)
+        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1, use_dropout=False, dropout_rate=0.3)
         self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.5)
         self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.5)
 
@@ -94,12 +94,12 @@ class BowNet2(nn.Module):
         self.resblock2_128b = ResidualBlock(in_channels=128, out_channels=128, kernel_size=3, downsample_factor=1)
         self.resblock2_128c = ResidualBlock(in_channels=128, out_channels=128, kernel_size=3, downsample_factor=1)
         self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2)
-        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1)
-        self.resblock3_256c = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1)
-        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1)
-        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
-        self.resblock4_512c = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
-        self.resblock4_512d = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
+        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1, use_dropout=True)
+        self.resblock3_256c = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1, use_dropout=True)
+        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True)
+        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True)
+        self.resblock4_512c = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True)
+        self.resblock4_512d = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True)
         self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
         if bow_training:
             self.fc_out = NormalizedLinear(512, self.num_classes)
@@ -311,15 +311,17 @@ class NonLinearClassifier(nn.Module):
         self.input_vector_len = self.num_channels_in*self.spatial_size*self.spatial_size
 
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(self.input_vector_len, 200)
-        self.bn1 = nn.BatchNorm1d(200)
+        self.fc1 = nn.Linear(self.input_vector_len, 512)
+        self.bn1 = nn.BatchNorm1d(512)
         self.relu1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(0.2)
 
-        self.fc2 = nn.Linear(200, 200)
-        self.bn2 = nn.BatchNorm1d(200)
+        self.fc2 = nn.Linear(512, 512)
+        self.bn2 = nn.BatchNorm1d(512)
         self.relu2 = nn.ReLU()
+        self.dropout2 = nn.Dropout(0.2)
 
-        self.fc_out = nn.Linear(200, self.num_classes)
+        self.fc_out = nn.Linear(512, self.num_classes)
 
         self.initialize()
 
@@ -327,7 +329,9 @@ class NonLinearClassifier(nn.Module):
 
         x = self.flatten(input_tensor)
         x = self.relu1(self.bn1(self.fc1(x)))
+        x = self.dropout1(x)
         x = self.relu2(self.bn2(self.fc2(x)))
+        x = self.dropout2(x)
 
         x = self.fc_out(x)
 
