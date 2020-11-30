@@ -13,6 +13,7 @@ batch_size = 128
 data_train_opt = {}
 data_train_opt['batch_size'] = batch_size
 data_train_opt['unsupervised'] = False
+data_train_opt['mode'] = 'bow'
 data_train_opt['epoch_size'] = None
 data_train_opt['random_sized_crop'] = False
 data_train_opt['dataset_name'] = 'cifar100'
@@ -21,6 +22,7 @@ data_train_opt['split'] = 'train'
 data_test_opt = {}
 data_test_opt['batch_size'] = batch_size
 data_test_opt['unsupervised'] = False
+data_test_opt['mode'] = 'bow'
 data_test_opt['epoch_size'] = None
 data_test_opt['random_sized_crop'] = False
 data_test_opt['dataset_name'] = 'cifar100'
@@ -44,6 +46,7 @@ dloader_train = DataLoader(
     dataset=dataset_train,
     batch_size=data_train_opt['batch_size'],
     unsupervised=data_train_opt['unsupervised'],
+    mode=data_train_opt['mode'],
     epoch_size=data_train_opt['epoch_size'],
     num_workers=4,
     shuffle=True)
@@ -52,6 +55,7 @@ dloader_test = DataLoader(
     dataset=dataset_test,
     batch_size=data_test_opt['batch_size'],
     unsupervised=data_test_opt['unsupervised'],
+    mode=data_train_opt['mode'],
     epoch_size=data_test_opt['epoch_size'],
     num_workers=4,
     shuffle=False)
@@ -65,8 +69,9 @@ if __name__ == "__main__":
         print(data[1].shape)
         plt.imshow(data[1].permute(1, 2, 0))
         plt.show()
-        print("label: ",label.shape)
-        print(label)
+        print("label: ",label[1].shape)
+        plt.imshow(label[1].permute(1, 2, 0))
+        plt.show()
         break
       # i +=1
       # if i == 10:

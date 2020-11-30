@@ -157,6 +157,7 @@ class DataLoader(object):
                  dataset,
                  batch_size=1,
                  unsupervised=True,
+                 mode='rotation',  #rotation, cifar,bow
                  epoch_size=None,
                  num_workers=0,
                  shuffle=True):
@@ -165,6 +166,7 @@ class DataLoader(object):
         self.epoch_size = epoch_size if epoch_size is not None else len(dataset)
         self.batch_size = batch_size
         self.unsupervised = unsupervised
+        self.mode = mode
         self.num_workers = num_workers
         self.split = self.dataset.split
 
@@ -182,14 +184,15 @@ class DataLoader(object):
             transforms.ToTensor(),
             transforms.Normalize(mean=mean_pix, std=std_pix)
         ]
-        
+
         # If testing we won't use any transforms
         self.passthrough_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=mean_pix, std=std_pix)
             ])
 
-        if self.unsupervised:
+        # if self.unsupervised:
+        if (self.mode == 'rotation'):
             self.transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize(mean=mean_pix, std=std_pix)
@@ -207,11 +210,16 @@ class DataLoader(object):
                 lambda x: x.transpose(1,2,0).astype(np.uint8),
                 ])
 
+        # else:
+        #     print("Not implemeted yet")
+            #Something for mode bow
+
     def get_iterator(self, epoch=0):
         # print("get iterator")
         rand_seed = epoch * self.epoch_size
         random.seed(rand_seed)
-        if self.unsupervised:
+        # if self.unsupervised:
+        if (self.mode == 'rotation'):
             # if in unsupervised mode define a loader function that given the
             # index of an image it returns the 4 rotated copies of the image
             # plus the label of the rotation, i.e., 0 for 0 degrees rotation,
@@ -237,7 +245,8 @@ class DataLoader(object):
                 batch[0] = batch[0].view([batch_size*rotations, channels, height, width])
                 batch[1] = batch[1].view([batch_size*rotations])
                 return batch
-        else: # supervised mode
+        # else: # supervised mode
+        elif(self.mode == "cifar"):
             print("get iterator supervised mode")
             # if in supervised mode define a loader function that given the
             # index of an image it returns the image and its categorical label
@@ -248,6 +257,18 @@ class DataLoader(object):
                 img = self.transform(img)
                 return img, categorical_label
             _collate_fun = default_collate
+
+        else:
+
+            def _load_function(idx):
+                idx = idx % len(self.dataset)
+                img, _ = self.dataset[idx]
+                img =np.array(img)
+                label = img
+                img = self.transform(img)
+                return img, img
+            _collate_fun = default_collate
+            # print("Not implemeted yet")
 
         tnt_dataset = tnt.dataset.ListDataset(elem_list=range(self.epoch_size),
             load=_load_function)
