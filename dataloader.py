@@ -177,7 +177,6 @@ class DataLoader(object):
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
             transforms.RandomResizedCrop(32, scale=(0.2, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
-            transforms.RandomVerticalFlip(),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=mean_pix, std=std_pix)
