@@ -101,7 +101,7 @@ checkpoint = torch.load(PATH)
 
 bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
 
-classifier = LinearClassifier(100).to(device)
+classifier = NonLinearClassifier(100, 64, 16).to(device)
 #classifier = LinearClassifier(100, 256, 8).to(device)
 num_epochs = 200
 
