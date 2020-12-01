@@ -16,6 +16,7 @@ from load_data_test import dloader_train, dloader_test
 from kmeans_pytorch import kmeans
 # alternatively, we can use SKLearn
 from sklearn.cluster import KMeans
+from sklearn.cluster import MiniBatchKMeans
 
 
 def train_rotation():
@@ -85,7 +86,7 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
 
 # TODO Need to implement the histogram creation. maybe
 
-def train_bow_reconstruction(K: int=2048):
+def train_bow_reconstruction(K: int=2048, kMeans_vocab):
     """Main training method presented in the paper. 
     Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
 # Just writing pseudo-code for now
@@ -101,7 +102,10 @@ def train_bow_reconstruction(K: int=2048):
         for i, data in enumerate(dloader_train, 0):
             # get the inputs; data is a list of [inputs, labels]
             # labels are now the expected BOW histogram rather than class label
-            inputs, labels = data
+            inputs, _ = data
+            labels = kMeans_vocab.predict(inputs)
+            inputs = inputs.cuda()
+            labels = labels.cuda()
 
             # zero the parameter gradients
             optimizer.zero_grad()

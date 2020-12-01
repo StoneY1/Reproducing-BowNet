@@ -24,14 +24,6 @@ import numpy as np
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
 
-data_train_opt = {}
-data_train_opt['batch_size'] = batch_size
-data_train_opt['unsupervised'] = True
-data_train_opt['epoch_size'] = None
-data_train_opt['random_sized_crop'] = False
-data_train_opt['dataset_name'] = 'cifar100'
-data_train_opt['split'] = 'train'
-
 data_test_opt = {}
 data_test_opt['batch_size'] = batch_size
 data_test_opt['unsupervised'] = True
@@ -40,7 +32,7 @@ data_test_opt['random_sized_crop'] = False
 data_test_opt['dataset_name'] = 'cifar100'
 data_test_opt['split'] = 'test'
 
-imgs_per_cat = data_train_opt['imgs_per_cat'] if ('imgs_per_cat' in data_train_opt) else None
+imgs_per_cat = None
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
@@ -72,65 +64,65 @@ dloader_test = DataLoader(
     shuffle=False)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device('cpu')
+#device = torch.device('cpu')
 num_epochs = 200
 bownet = BowNet(num_classes=4).to(device)
 criterion = nn.CrossEntropyLoss().to(device)
 
 
-PATH = "best_bownet1_checkpoint.pt"
+PATH = "best_bownet_checkpoint1.pt"
 checkpoint = torch.load(PATH, map_location=torch.device('cpu'))
 
 bownet,_,_,_ = load_checkpoint(checkpoint,device, BowNet)
-#with device:
-print(f"EVALUATION")
+with torch.cuda.device(0):
+    print(f"EVALUATION")
 
-print("number of batch: ",len(dloader_test))
-start_epoch = time.time()
-running_loss = 0.0
-accs = []
-test_correct = 0
-test_total = 0
-epoch = 1
-for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
-    start_time = time.time()
-    # get the inputs; data is a list of [inputs, labels]
-    inputs, labels = batch
+    print("number of batch: ",len(dloader_test))
+    start_epoch = time.time()
+    running_loss = 0.0
+    accs = []
+    test_correct = 0
+    test_total = 0
+    epoch = 1
+    for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
+        start_time = time.time()
+        # get the inputs; data is a list of [inputs, labels]
+        inputs, labels = batch
 
-    #Load data to GPU
-    #inputs, labels = inputs.cuda(), labels.cuda()
-    time_load_data = time.time() - start_time
-
-
-    # forward + backward + optimize
-    logits, preds = bownet(inputs)
-
-    # print(preds[:,0])
-
-    #Compute loss
-    loss = criterion(logits[:,0], labels)
+        #Load data to GPU
+        inputs, labels = inputs.cuda(), labels.cuda()
+        time_load_data = time.time() - start_time
 
 
-    # print statistics
-    running_loss += loss.item()
+        # forward + backward + optimize
+        logits, preds = bownet(inputs)
 
-    acc_batch, batch_correct_preds = accuracy(preds[:,0].data, labels, topk=(1,))
-    accs.append(acc_batch[0].item())
-    test_correct += batch_correct_preds
-    test_total += preds.size(0) 
-    #accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
+        # print(preds[:,0])
+
+        #Compute loss
+        loss = criterion(logits[:,0], labels)
 
 
-# plt.imshow(check_input)
-# plt.savefig("imag" + str(epoch) + ".png")
-accs = np.array(accs)
-#print("epoche test accuracy: ",accs.mean())
-print("epoch test accuracy: ", 100*test_correct/test_total)
+        # print statistics
+        running_loss += loss.item()
 
-print("Time to load the data", time_load_data)
-print("Time to finish an epoch ", time.time() - start_epoch)
-print('[%d, %5d] epoches loss: %.3f' %
-      (epoch, len(dloader_test), running_loss / len(dloader_test)))
+        acc_batch, batch_correct_preds = accuracy(preds[:,0].data, labels, topk=(1,))
+        accs.append(acc_batch[0].item())
+        test_correct += batch_correct_preds
+        test_total += preds.size(0) 
+        #accs.append(accuracy(preds[:,0].data, labels, topk=(1,))[0].item())
+
+
+    # plt.imshow(check_input)
+    # plt.savefig("imag" + str(epoch) + ".png")
+    accs = np.array(accs)
+    #print("epoche test accuracy: ",accs.mean())
+    print("epoch test accuracy: ", 100*test_correct/test_total)
+
+    print("Time to load the data", time_load_data)
+    print("Time to finish an epoch ", time.time() - start_epoch)
+    print('[%d, %5d] epoches loss: %.3f' %
+          (epoch, len(dloader_test), running_loss / len(dloader_test)))
 
 
 print('Finished Training')
