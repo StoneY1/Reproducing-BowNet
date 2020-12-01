@@ -45,8 +45,14 @@ class BowNet(nn.Module):
         x = self.relu1_64(self.bn1_64(self.conv1_64(input_tensor)))
         x = self.resblock1_64a(x)
         x = self.resblock1_64b(x)
+        
+        self.resblock1_64b_fmaps = x
+
         x = self.resblock2_128a(x)
         x = self.resblock2_128b(x)
+        
+        self.resblock2_128b_fmaps = x
+
         x = self.resblock3_256a(x)
         x = self.resblock3_256b(x)
 

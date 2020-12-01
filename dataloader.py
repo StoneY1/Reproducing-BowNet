@@ -16,6 +16,7 @@ import numpy as np
 import random
 from torch.utils.data.dataloader import default_collate
 from PIL import Image
+import copy
 import os
 import errno
 import numpy as np
@@ -175,7 +176,6 @@ class DataLoader(object):
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
             transforms.RandomResizedCrop(32, scale=(0.2, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
-            transforms.RandomVerticalFlip(),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=mean_pix, std=std_pix)
@@ -260,9 +260,14 @@ class DataLoader(object):
                 idx = idx % len(self.dataset)
                 img, _ = self.dataset[idx]
                 img =np.array(img)
-                label = img
+                label = copy.deepcopy(img)
+                standardized_img = self.passthrough_transform(label) # Transform name is terrible, but basically it applies ToTensor() and Normalize
                 img = self.transform(img)
-                return img, img
+                return img, standardized_img
+                #label = img
+                #img = self.transform(img)
+                #return img, img
+                
             _collate_fun = default_collate
             # print("Not implemeted yet")
 

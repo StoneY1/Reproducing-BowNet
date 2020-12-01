@@ -9,6 +9,27 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.nn.modules.loss import _Loss as Loss
+
+
+class SoftCrossEntropyLoss(Loss):
+    """Need to implement a cross entropy loss for soft-targets. 
+    """
+    def __init__(self, reduction='mean'):
+        super().__init__()
+        self.reduction = reduction
+
+    def forward(self, output, target):
+        log_preds = F.log_softmax(output, dim=-1)
+        batchloss = -torch.sum(target * log_preds, dim=1)
+        if self.reduction == 'sum':
+            soft_crossentropy_loss = batchloss.sum()
+        elif self.reduction == 'mean':
+                soft_crossentropy_loss = batchloss.mean()
+        else:
+            soft_crossentropy_loss = batchloss
+
+        return soft_crossentropy_loss
 
 class ResidualBlock(nn.Module):
     """Basic 2-layer residual block as described in the original ResNet paper https://arxiv.org/abs/1512.03385"""
@@ -76,7 +97,7 @@ class NormalizedLinear(nn.Module):
         # Initialize all relevant paramters. Weight tensor, normalized weight, gamma scalar
         self.weight = nn.Parameter(torch.Tensor(self.c_out, self.c_in))
         self.weight.data.uniform_(-self.init_limit, self.init_limit) # Classic GlorotUniform initialization
-        self.normed_weight = self.weight/torch.norm(self.weight)
+        self.normed_weight = nn.Parameter(self.weight/torch.norm(self.weight))
         self.gamma = nn.Parameter(torch.Tensor(1,1))
         self.gamma.data.fill_(1.0)
 
