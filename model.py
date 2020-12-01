@@ -45,12 +45,12 @@ class BowNet(nn.Module):
         x = self.relu1_64(self.bn1_64(self.conv1_64(input_tensor)))
         x = self.resblock1_64a(x)
         x = self.resblock1_64b(x)
-        
+
         self.resblock1_64b_fmaps = x
 
         x = self.resblock2_128a(x)
         x = self.resblock2_128b(x)
-        
+
         self.resblock2_128b_fmaps = x
 
         x = self.resblock3_256a(x)
@@ -266,29 +266,13 @@ class LinearClassifier(nn.Module):
 
 
     def forward(self, input_tensor):
-        # x = input_tensor.view(input_tensor.size(0), -1)
-        # x = self.global_avg_pool(input_tensor)
-        #x = self.adaptive_max_pool(input_tensor)
-        # print("adaptive",x.shape)
 
-        #x = self.batch_norm(x)
-
-        # print("batch_norm ",x.shape)
         x = input_tensor
 
         x = self.flatten(x)
-        # print("flatten: ",x.shape)
-        #
-        # x= x.reshape(-1, 256)
-        # x = input_tensor.view(-1, 16384)
-        # print(x.shape)
+
         # x = F.relu(x)
         x = self.fc1(x)
-        # print("fc1_out: ",x.shape)
-        # x = F.relu(x)
-        # # print(x.shape)
-        # x = self.fc2(x)
-
         x = x.reshape(-1, 1, self.num_classes)
 
         logits = x
