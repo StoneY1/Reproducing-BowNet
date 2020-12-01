@@ -86,11 +86,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_epochs = 100
 bownet = BowNet(num_classes=4).to(device)
 criterion = nn.CrossEntropyLoss().to(device)
-#optimizer = optim.SGD(bownet.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4) # used for BowNet2 and 3
-#optimizer = optim.Adam(bownet.parameters(), lr=0.01)
 optimizer = optim.SGD(bownet.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
-#lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.2)
-#lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=60, gamma=0.2)
 lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
 
 # tensors = {}
@@ -130,10 +126,9 @@ with torch.cuda.device(0):
             # forward + backward + optimize
             logits, preds = bownet(inputs)
 
-            # print(preds[:,0])
 
             #Compute loss
-            loss = criterion(logits[:, 0], labels)
+            loss = criterion(logits, labels)
 
             #Back Prop and Optimize
             loss.backward()
@@ -143,7 +138,7 @@ with torch.cuda.device(0):
             running_loss += loss.item()
 
             loss_100 += loss.item()
-            acc_batch, batch_correct_preds = accuracy(preds[:,0].data, labels, topk=(1,))
+            acc_batch, batch_correct_preds = accuracy(preds.data, labels, topk=(1,))
             accs.append(acc_batch[0].item())
             total_correct += batch_correct_preds
             total_samples += preds.size(0) 
@@ -204,13 +199,13 @@ with torch.cuda.device(0):
             # print(preds[:,0])
 
             #Compute loss
-            loss = criterion(logits[:,0], labels)
+            loss = criterion(logits, labels)
 
 
             # print statistics
             running_loss += loss.item()
 
-            acc_batch, batch_correct_preds = accuracy(preds[:,0].data, labels, topk=(1,))
+            acc_batch, batch_correct_preds = accuracy(preds.data, labels, topk=(1,))
             accs.append(acc_batch[0].item())
             test_correct += batch_correct_preds
             test_total += preds.size(0) 

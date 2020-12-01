@@ -18,6 +18,7 @@ class BowNet(nn.Module):
         """Define layers"""
         super().__init__()
         self.num_classes = num_classes
+        self.bow_training = bow_training
         self.conv1_64 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.bn1_64 = nn.BatchNorm2d(num_features=64)
         self.relu1_64 = nn.ReLU()
@@ -32,10 +33,12 @@ class BowNet(nn.Module):
         self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.5)
 
         self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
-        if bow_training:
-            self.fc_out = NormalizedLinear(512, self.num_classes)
+        if self.bow_training:
+            self.fc_out = NormalizedLinear(256, self.num_classes)
+            self.fc_fin = 256
         else:
             self.fc_out = nn.Linear(512, self.num_classes)
+            self.fc_fin = 512
         # self.fc_out = nn.Linear(512,1)
         self.initialize()
 
@@ -59,10 +62,12 @@ class BowNet(nn.Module):
         # We will need these feature maps for the K-means clustering to create a Visual BoW vocabulary
         self.resblock3_256b_fmaps = x
 
-        x = self.resblock4_512a(x)
-        x = self.resblock4_512b(x)
+        if not self.bow_training:
+            # Only add these residual layers for the Rotation pre-training
+            x = self.resblock4_512a(x)
+            x = self.resblock4_512b(x)
 
-        x = self.global_avg_pool(x).reshape(-1, 1, 512)
+        x = self.global_avg_pool(x).reshape(-1, self.fc_fin)
         x = self.fc_out(x)
         logits = x
         # print("bownet x shape", x.shape)
@@ -141,7 +146,7 @@ class BowNet2(nn.Module):
         x = self.resblock4_512c(x)
         x = self.resblock4_512d(x)
 
-        x = self.global_avg_pool(x).reshape(-1, 1, 512)
+        x = self.global_avg_pool(x).reshape(-1, 512)
         x = self.fc_out(x)
         logits = x
         # print("bownet x shape", x.shape)
@@ -226,7 +231,7 @@ class BowNet3(nn.Module):
         x = self.resblock4_512b(x)
         x = self.resblock4_512c(x)
 
-        x = self.global_avg_pool(x).reshape(-1, 1, 512)
+        x = self.global_avg_pool(x).reshape(-1, 512)
         x = self.fc_out(x)
         logits = x
         # print("bownet x shape", x.shape)
@@ -262,7 +267,7 @@ class LinearClassifier(nn.Module):
         #self.fc1 = nn.Linear(6400,self.num_classes)
         self.fc2 = nn.Linear(1000,self.num_classes)
 
-        self.initilize()
+        self.initialize()
 
 
     def forward(self, input_tensor):
@@ -273,22 +278,23 @@ class LinearClassifier(nn.Module):
 
         # x = F.relu(x)
         x = self.fc1(x)
-        x = x.reshape(-1, 1, self.num_classes)
+        x = x
 
         logits = x
         preds = F.softmax(x, dim=-1)
 
         return logits, preds
 
-    def initilize(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                fin = m.in_features
-                fout = m.out_features
+    def initialize(self):
+        for m in self._modules:
+            block = self._modules[m]
+            if isinstance(block, nn.Linear):
+                fin = block.in_features
+                fout = block.out_features
                 std_val = np.sqrt(2.0 / fout)
-                m.weight.data.normal_(0.0, std_val)
-                if m.bias is not None:
-                    m.bias.data.fill_(0.0)
+                block.weight.data.normal_(0.0, std_val)
+                if block.bias is not None:
+                    block.bias.data.fill_(0.0)
 
 class NonLinearClassifier(nn.Module):
 
@@ -325,7 +331,7 @@ class NonLinearClassifier(nn.Module):
 
         x = self.fc_out(x)
 
-        x = x.reshape(-1, 1, self.num_classes)
+        x = x
         logits = x
         preds = F.softmax(x, dim=-1)
 
@@ -342,8 +348,8 @@ class NonLinearClassifier(nn.Module):
                     m.bias.data.fill_(0.0)
 
 
-def load_checkpoint(checkpoint,device, bownet_arch):
-    bownet = bownet_arch(num_classes=4).to(device)
+def load_checkpoint(checkpoint, device, bownet_arch, num_classes=4, bow_training=False):
+    bownet = bownet_arch(num_classes, bow_training).to(device)
     optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9,weight_decay= 5e-4)
 
     bownet.load_state_dict(checkpoint['model_state_dict'])
