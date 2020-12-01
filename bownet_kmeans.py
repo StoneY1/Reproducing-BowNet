@@ -13,6 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from model import BowNet
 from model import load_checkpoint
+from layers import SoftCrossEntropyLoss
 from dataloader import DataLoader, GenericDataset
 from kmeans_pytorch import kmeans
 # alternatively, we can use SKLearn
@@ -31,14 +32,26 @@ dataset_train = GenericDataset(
     random_sized_crop=False,
     num_imgs_per_cat=None)
 
+dataset_test = GenericDataset(
+    dataset_name='cifar100',
+    split='test',
+    random_sized_crop=False)
+
 dloader_train = DataLoader(
     dataset=dataset_train,
     batch_size=128,
-    unsupervised=False,
+    mode='bow',
     epoch_size=None,
     num_workers=4,
     shuffle=True)
 
+dloader_test = DataLoader(
+    dataset=dataset_test,
+    batch_size=128,
+    mode='bow',
+    epoch_size=None,
+    num_workers=4,
+    shuffle=False)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -63,66 +76,106 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
 
     rotnet_feature_vectors = np.array(feature_vectors_list)
     
-    '''
-    # kmeans using pytorch; this package doesn't seem to have a "predict" method
-    cluster_ids_x, cluster_centers = kmeans(
-        X=torch.Tensor(rotnet_feature_vectors).cuda(), num_clusters=K, distance='euclidean', device=torch.device('cuda:0')
-    )
-    '''
-
-    # Kmeans using sklearn
-    #start = time.time()
-    #sk_kmeans = KMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
-    #print(f"KMeans takes {time.time() - start}s")
     start = time.time()
     sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
     print(f"MiniBatchKMeans takes {time.time() - start}s")
     rotnet_vocab = sk_kmeans.cluster_centers_
-    import pdb; pdb.set_trace()
 
     return sk_kmeans, rotnet_vocab
 
-def train_bow_reconstruction(KMeans_vocab, K: int=2048):
+def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
+    """Given a KMeans vocab and collection of fmaps, generates the associated BOW histogram"""
+    fmap_vectors = fmaps.reshape(-1, fmaps.shape[-1])
+    batch_pred_clusters = KMeans_vocab.predict(fmap_vectors).reshape(-1, spatial_density)
+    bow_hist_labels = [np.histogram(pred_clusters, bins=K, range=(0, K), density=True)[0] for pred_clusters in batch_pred_clusters]
+    return np.array(bow_hist_labels)
+
+def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_checkpoint, K: int=2048):
     """Main training method presented in the paper. 
     Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
-# Just writing pseudo-code for now
-    num_epochs = 200
+    num_epochs = 30
+    checkpoint = 'bownet_bow_training_checkpoint.pt'
+
+    # Loading frozen RotNet checkpoint
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    rotnet_ckpt = torch.load(rotnet_checkpoint)
+
+    rotnet, _, _, _ = load_checkpoint(rotnet_ckpt, device, BowNet)
+    for para in rotnet.parameters():
+        para.required_grad = False
 
     # Now for actual BoW training, output is equal to K
-    bownet = BowNet(num_classes=K, bow_training=True)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(bownet.parameters(), lr=0.001, momentum=0.9)
+    bownet = BowNet(num_classes=K, bow_training=True).to(device)
+    rotnet.eval()
+    criterion = SoftCrossEntropyLoss().to(device)
+    optimizer = optim.SGD(bownet.parameters(), lr=0.01, momentum=0.9)
     for epoch in range(num_epochs):  # loop over the dataset multiple times
-
+        bownet.train()
         running_loss = 0.0
-        for i, data in enumerate(dloader_train, 0):
+        print_cnt = 0
+        for i, data in enumerate(tqdm(dloader_train(epoch))):
             # get the inputs; data is a list of [inputs, labels]
             # labels are now the expected BOW histogram rather than class label
-            inputs, _ = data
-            labels = KMeans_vocab.predict(inputs)
+            inputs, label_imgs = data
             inputs = inputs.cuda()
-            labels = labels.cuda()
+            label_imgs = label_imgs.cuda()
 
             # zero the parameter gradients
             optimizer.zero_grad()
 
             # forward + backward + optimize
+            # Get feature maps of RotNet generated from reference images
+            rotnet(label_imgs)
+            label_fmaps = rotnet.resblock3_256b_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+
             logits, preds = bownet(inputs)
-            loss = criterion(logits, labels)
+            # Not the cleanest way but not much choice given we don't have a CUDA based KMeans function
+            labels = get_bow_histograms(KMeans_vocab, label_fmaps, 64, K)
+            labels = torch.Tensor(labels).cuda()
+            loss = criterion(logits[:, 0], labels)
             loss.backward()
             optimizer.step()
 
             # print statistics
             running_loss += loss.item()
-            if i % 2000 == 1999:    # print every 2000 mini-batches
+            if i % 100 == 99:    # print every 100 mini-batches
+                print_cnt += 1
                 print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 2000))
-                running_loss = 0.0
+                      (epoch + 1, i + 1, running_loss / (100*print_cnt)))
+        print(f"[***] Epoch {epoch} training loss: {running_loss/len(dloader_train)}")
+        
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': bownet.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,},
+            checkpoint)
+
+        torch.cuda.empty_cache()
+        optimizer.zero_grad()
+        bownet.eval()
+        running_loss = 0.0
+        for i, data in enumerate(tqdm(dloader_test())):
+            inputs, label_imgs = data
+            inputs = inputs.cuda()
+            label_imgs = label_imgs.cuda()
+
+            rotnet(label_imgs)
+            label_fmaps = rotnet.resblock3_256b_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+
+            logits, preds = bownet(inputs)
+            labels = get_bow_histograms(KMeans_vocab, label_fmaps, 64, K)
+            labels = torch.Tensor(labels).cuda()
+            loss = criterion(logits[:, 0], labels)
+
+            # print statistics
+            running_loss += loss.item()
+        print(f"[***] Epoch {epoch} test loss: {running_loss/len(dloader_test)}")
 
     print('Finished Training')
     return
 
-# TODO Need to implement the histogram creation. maybe
 with torch.cuda.device(0):
     sk_kmeans, rotnet_vocab = build_RotNet_vocab(bownet)
-    train_bow_reconstruction(sk_kmeans, K=2048)
+    np.save("RotNet_BOW_Vocab.npy", rotnet_vocab)
+    train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, 'best_bownet_checkpoint1.pt', K=2048)
