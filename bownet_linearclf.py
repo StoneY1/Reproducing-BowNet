@@ -5,8 +5,10 @@ import imp
 from dataloader import DataLoader, GenericDataset
 import matplotlib.pyplot as plt
 
+
 import copy
-from model import BowNet, load_checkpoint, LinearClassifier
+from model import BowNet, load_checkpoint, LinearClassifier, NonLinearClassifier
+#from model import BowNet3 as BowNet
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -20,7 +22,7 @@ from sklearn.linear_model import LogisticRegression
 
 from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
-from kmeans_pytorch import kmeans
+#from kmeans_pytorch import kmeans
 
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
@@ -91,21 +93,22 @@ dloader_test = DataLoader(
     shuffle=False)
 
 
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
+
 PATH = "best_bownet_checkpoint1_7285acc.pt"
 checkpoint = torch.load(PATH)
 
 bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
 
-
-classifier = LinearClassifier(100).to(device)
+classifier = NonLinearClassifier(100, 64, 16).to(device)
+#classifier = LinearClassifier(100, 256, 8).to(device)
 num_epochs = 200
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.2)
+optimizer = optim.SGD(classifier.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-6)
+#optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
+lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
 
 for para in bownet.parameters():
     para.requires_grad = False
@@ -126,6 +129,9 @@ with torch.cuda.device(0):
         accs = []
         total_correct = 0
         total_samples = 0
+        # Need to set bownet to evaluate so that it uses frozen BatchNorm params and no Dropout
+        bownet.eval()
+        classifier.train()
         for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
         # for idx, batch in enumerate(dloader_train(epoch)):
 
@@ -145,8 +151,6 @@ with torch.cuda.device(0):
             # print(conv_out.shape)
 
 
-
-
             time_load_data = time.time() - start_time
 
             # print(labels.shape)
@@ -163,7 +167,6 @@ with torch.cuda.device(0):
             #Compute loss
             loss = criterion(logits[:,0], labels)
 
-
             #Back Prop and Optimize
             loss.backward()
             optimizer.step()
@@ -175,12 +178,10 @@ with torch.cuda.device(0):
 
             loss_100 += loss.item()
 
-
             acc_batch, batch_correct_preds = accuracy(preds[:,0].data, labels, topk=(1,))
             accs.append(acc_batch[0].item())
             total_correct += batch_correct_preds
             total_samples += preds.size(0)
-
 
             # if idx % 100 == 99:
             #     print('[%d, %5d] loss: %.3f' %
@@ -225,10 +226,7 @@ with torch.cuda.device(0):
 
 
             # forward + backward + optimize
-
-
             bownet(inputs)
-
             conv_out = bownet.resblock3_256b_fmaps
 
             logits, preds = classifier(conv_out)
@@ -251,7 +249,8 @@ with torch.cuda.device(0):
         # plt.savefig("imag" + str(epoch) + ".png")
 
         # lr scheduler will monitor test loss
-        lr_scheduler.step(running_loss/len(dloader_test))
+        #lr_scheduler.step(running_loss/len(dloader_test))
+        lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
         accs = np.array(accs)
         #print("epoche test accuracy: ",accs.mean())
         print("epoch test accuracy: ", 100*test_correct/test_total)
@@ -260,3 +259,4 @@ with torch.cuda.device(0):
         print("Time to finish an epoch ", time.time() - start_epoch)
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_test), running_loss / len(dloader_test)))
+
