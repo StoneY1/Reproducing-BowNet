@@ -76,6 +76,8 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
 
     rotnet_feature_vectors = np.array(feature_vectors_list)
     
+
+    # Using MiniBatchKmeans because regular KMeans is too compute heavy
     start = time.time()
     sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
     print(f"MiniBatchKMeans takes {time.time() - start}s")

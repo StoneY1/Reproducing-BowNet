@@ -261,9 +261,13 @@ class DataLoader(object):
                 img, _ = self.dataset[idx]
                 img =np.array(img)
                 label = copy.deepcopy(img)
-                standardized_img = self.passthrough_transform(label)
+                standardized_img = self.passthrough_transform(label) # Transform name is terrible, but basically it applies ToTensor() and Normalize
                 img = self.transform(img)
                 return img, standardized_img
+                #label = img
+                #img = self.transform(img)
+                #return img, img
+                
             _collate_fun = default_collate
             # print("Not implemeted yet")
 
