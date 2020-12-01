@@ -190,10 +190,7 @@ with torch.cuda.device(0):
             #     acc = accuracy(logits[:,0], labels, topk=(1,))[0].item()
             #     print("accuracy after 100 batch: ",acc)
             #     print("Time to finish 100 batch", time.time() - start_time)
-        # lr_scheduler.step()
-        # print("epoch acc ", true_count/len(dloader_train.dataset))
-        # plt.imshow(check_input)
-        # plt.savefig("imag" + str(epoch) + ".png")
+
         accs = np.array(accs)
         print("epoch training accuracy: ", 100*total_correct/total_samples)
 
@@ -245,11 +242,6 @@ with torch.cuda.device(0):
             test_total += preds.size(0)
 
 
-        # plt.imshow(check_input)
-        # plt.savefig("imag" + str(epoch) + ".png")
-
-        # lr scheduler will monitor test loss
-        #lr_scheduler.step(running_loss/len(dloader_test))
         lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
         accs = np.array(accs)
         #print("epoche test accuracy: ",accs.mean())
@@ -259,4 +251,3 @@ with torch.cuda.device(0):
         print("Time to finish an epoch ", time.time() - start_epoch)
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_test), running_loss / len(dloader_test)))
-
