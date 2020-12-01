@@ -69,7 +69,7 @@ class BowNet(nn.Module):
         preds = F.softmax(x, dim=-1)
 
         return logits, preds
-    
+
     def initialize(self):
         for m in self._modules:
             block = self._modules[m]
@@ -121,7 +121,7 @@ class BowNet2(nn.Module):
         x = self.resblock1_64a(x)
         x = self.resblock1_64b(x)
         self.resblock1_64b_fmaps = x
-        
+
         x = self.resblock2_128a(x)
         self.resblock2_128a_fmaps = x
         x = self.resblock2_128b(x)
@@ -148,7 +148,7 @@ class BowNet2(nn.Module):
         preds = F.softmax(x, dim=-1)
 
         return logits, preds
-    
+
     def initialize(self):
         for m in self._modules:
             block = self._modules[m]
@@ -289,7 +289,7 @@ class LinearClassifier(nn.Module):
         # # print(x.shape)
         # x = self.fc2(x)
 
-        x = x.reshape(-1, 1, 100)
+        x = x.reshape(-1, 1, self.num_classes)
 
         logits = x
         preds = F.softmax(x, dim=-1)
