@@ -172,7 +172,7 @@ class DataLoader(object):
 
         my_transformations = [
             transforms.ToTensor(),
-            transforms.Normalize(mean=mean_pix, std=std_pix)
+            transforms.Normalize(mean=mean_pix, std=std_pix),
             transforms.ToPILImage()]
         if mode == 'bow':
             # We use minimal data augmentation for the actual CIFAR supervised training
