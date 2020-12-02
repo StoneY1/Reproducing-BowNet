@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 
 import copy
 from model import BowNet, load_checkpoint, LinearClassifier, NonLinearClassifier
-#from model import BowNet3 as BowNet
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -25,11 +24,11 @@ from sklearn.cluster import MiniBatchKMeans
 #from kmeans_pytorch import kmeans
 
 # Set train and test datasets and the corresponding data loaders
-batch_size = 128
+batch_size = 64
 
 data_train_opt = {}
 data_train_opt['batch_size'] = batch_size
-data_train_opt['unsupervised'] = False #Set to False then the label is the class - Set to True to get rotation label
+data_train_opt['mode'] = 'cifar' 
 data_train_opt['epoch_size'] = None
 data_train_opt['random_sized_crop'] = False
 data_train_opt['dataset_name'] = 'cifar100'
@@ -37,7 +36,7 @@ data_train_opt['split'] = 'train'
 
 data_test_opt = {}
 data_test_opt['batch_size'] = batch_size
-data_test_opt['unsupervised'] = False #Set to False then the label is the class - Set to True to get rotation label
+data_test_opt['mode'] = 'cifar'
 data_test_opt['epoch_size'] = None
 data_test_opt['random_sized_crop'] = False
 data_test_opt['dataset_name'] = 'cifar100'
@@ -77,8 +76,7 @@ dataset_test = GenericDataset(
 dloader_train = DataLoader(
     dataset=dataset_train,
     batch_size=data_train_opt['batch_size'],
-    mode = 'cifar',
-    unsupervised=data_train_opt['unsupervised'],
+    mode=data_train_opt['mode'],
     epoch_size=data_train_opt['epoch_size'],
     num_workers=4,
     shuffle=True)
@@ -86,8 +84,7 @@ dloader_train = DataLoader(
 dloader_test = DataLoader(
     dataset=dataset_test,
     batch_size=data_test_opt['batch_size'],
-    unsupervised=data_test_opt['unsupervised'],
-    mode = 'cifar',
+    mode=data_test_opt['mode'],
     epoch_size=data_test_opt['epoch_size'],
     num_workers=4,
     shuffle=False)
@@ -96,19 +93,20 @@ dloader_test = DataLoader(
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
-PATH = "best_bownet_checkpoint1_7285acc.pt"
+PATH = "bownet_bow_training_checkpoint.pt"
 checkpoint = torch.load(PATH)
+bow_training = True
+K_clusters = 2048
+bownet, _, _, _ = load_checkpoint(checkpoint, device, BowNet, K_clusters, bow_training)
 
-bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
-
-classifier = NonLinearClassifier(100, 64, 16).to(device)
-#classifier = LinearClassifier(100, 256, 8).to(device)
-num_epochs = 200
+#classifier = LinearClassifier(100, 3, 32).to(device)
+classifier = LinearClassifier(100, 2048, 1).to(device)
+num_epochs = 100
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
-#optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
+optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0)
+lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
+#lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
 
 for para in bownet.parameters():
     para.requires_grad = False
@@ -145,12 +143,8 @@ with torch.cuda.device(0):
             #Load data to GPU
             inputs, labels = inputs.cuda(), labels.cuda()
 
-            bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
-
-            # print(conv_out.shape)
-
-
+            # Get BOW-histogram predicted by BowNet
+            bow_logits, softmax_histograms = bownet(inputs)
             time_load_data = time.time() - start_time
 
             # print(labels.shape)
@@ -160,9 +154,7 @@ with torch.cuda.device(0):
             optimizer.zero_grad()
 
             # forward + backward + optimize
-            logits, preds = classifier(conv_out)
-
-            # print(preds[:,0])
+            logits, preds = classifier(softmax_histograms)
 
             #Compute loss
             loss = criterion(logits, labels)
@@ -171,7 +163,6 @@ with torch.cuda.device(0):
             loss.backward()
             optimizer.step()
 
-            # print(classifier.fc1_out.weight.grad)
 
             # print statistics
             running_loss += loss.item()
@@ -182,14 +173,6 @@ with torch.cuda.device(0):
             accs.append(acc_batch[0].item())
             total_correct += batch_correct_preds
             total_samples += preds.size(0)
-
-            # if idx % 100 == 99:
-            #     print('[%d, %5d] loss: %.3f' %
-            #           (epoch , idx, loss_100/100))
-            #     loss_100 = 0.0
-            #     acc = accuracy(logits[:,0], labels, topk=(1,))[0].item()
-            #     print("accuracy after 100 batch: ",acc)
-            #     print("Time to finish 100 batch", time.time() - start_time)
 
         accs = np.array(accs)
         print("epoch training accuracy: ", 100*total_correct/total_samples)
@@ -212,6 +195,7 @@ with torch.cuda.device(0):
         test_total = 0
 
         classifier.eval()
+        
         for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
             start_time = time.time()
             # get the inputs; data is a list of [inputs, labels]
@@ -222,11 +206,9 @@ with torch.cuda.device(0):
             time_load_data = time.time() - start_time
 
 
-            # forward + backward + optimize
-            bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
+            bow_logits, softmax_histograms = bownet(inputs)
 
-            logits, preds = classifier(conv_out)
+            logits, preds = classifier(softmax_histograms)
 
 
             #Compute loss
@@ -241,8 +223,10 @@ with torch.cuda.device(0):
             test_correct += batch_correct_preds
             test_total += preds.size(0)
 
+        
+        #lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
+        lr_scheduler.step(running_loss/len(dloader_test)) # For LR scheduler that monitors test loss
 
-        lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
         accs = np.array(accs)
         #print("epoche test accuracy: ",accs.mean())
         print("epoch test accuracy: ", 100*test_correct/test_total)

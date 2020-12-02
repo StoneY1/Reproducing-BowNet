@@ -21,7 +21,7 @@ class SoftCrossEntropyLoss(Loss):
 
     def forward(self, output, target):
         log_preds = F.log_softmax(output, dim=-1)
-        batchloss = -torch.sum(target * log_preds, dim=1)
+        batchloss = -torch.sum(target * log_preds, dim=-1)
         if self.reduction == 'sum':
             soft_crossentropy_loss = batchloss.sum()
         elif self.reduction == 'mean':

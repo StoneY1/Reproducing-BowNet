@@ -21,10 +21,10 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
-PATH = "bownet_checkpoint1.pt"
+PATH = "best_rotnet_checkpoint1_7985acc.pt"
 checkpoint = torch.load(PATH)
 
-bownet,_,_,_ = load_checkpoint(checkpoint,device, BowNet)
+rotnet,_,_,_ = load_checkpoint(checkpoint,device, BowNet)
 
 dataset_train = GenericDataset(
     dataset_name='cifar100',
@@ -55,7 +55,7 @@ dloader_test = DataLoader(
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def build_RotNet_vocab(bownet: BowNet, K: int=2048):
+def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
     """After training RotNet, we will get the bag-of-words vocabulary using Euclidean distance based KMeans clustering"""
     feature_vectors_list = []
 
@@ -68,9 +68,8 @@ def build_RotNet_vocab(bownet: BowNet, K: int=2048):
             # Forward data through bownet, then get resblock_3_256b fmaps
             # The authors propose densely sampling feature C-dimensional feature vectors at each
             # spatial location where C is the size of the channel dimension. These feature vectors are used for the KMeans clustering
-            outputs = bownet(inputs)
-            #resblock3_fmaps = bownet.resblock3_256b_fmaps.transpose((0, 2, 3, 1))
-            resblock3_fmaps = bownet.resblock3_256b_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+            outputs = rotnet(inputs)
+            resblock3_fmaps = rotnet.resblock3_256b_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
             resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[-1])
             feature_vectors_list.extend(resblock3_feature_vectors)
 
@@ -95,7 +94,7 @@ def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
 def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_checkpoint, K: int=2048):
     """Main training method presented in the paper. 
     Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
-    num_epochs = 30
+    num_epochs = 150
     checkpoint = 'bownet_bow_training_checkpoint.pt'
 
     # Loading frozen RotNet checkpoint
@@ -111,6 +110,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
     rotnet.eval()
     criterion = SoftCrossEntropyLoss().to(device)
     optimizer = optim.SGD(bownet.parameters(), lr=0.01, momentum=0.9)
+    lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=60, gamma=0.1)
     for epoch in range(num_epochs):  # loop over the dataset multiple times
         bownet.train()
         running_loss = 0.0
@@ -134,7 +134,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
             # Not the cleanest way but not much choice given we don't have a CUDA based KMeans function
             labels = get_bow_histograms(KMeans_vocab, label_fmaps, 64, K)
             labels = torch.Tensor(labels).cuda()
-            loss = criterion(logits[:, 0], labels)
+            loss = criterion(logits, labels)
             loss.backward()
             optimizer.step()
 
@@ -168,7 +168,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
             logits, preds = bownet(inputs)
             labels = get_bow_histograms(KMeans_vocab, label_fmaps, 64, K)
             labels = torch.Tensor(labels).cuda()
-            loss = criterion(logits[:, 0], labels)
+            loss = criterion(logits, labels)
 
             # print statistics
             running_loss += loss.item()
@@ -178,6 +178,6 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
     return
 
 with torch.cuda.device(0):
-    sk_kmeans, rotnet_vocab = build_RotNet_vocab(bownet)
+    sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet)
     np.save("RotNet_BOW_Vocab.npy", rotnet_vocab)
-    train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, 'best_bownet_checkpoint1.pt', K=2048)
+    train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, PATH, K=2048)

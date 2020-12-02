@@ -165,7 +165,7 @@ with torch.cuda.device(0):
             # print(preds[:,0])
 
             #Compute loss
-            loss = criterion(logits[:,0], labels)
+            loss = criterion(logits, labels)
 
             #Back Prop and Optimize
             loss.backward()
@@ -178,7 +178,7 @@ with torch.cuda.device(0):
 
             loss_100 += loss.item()
 
-            acc_batch, batch_correct_preds = accuracy(preds[:,0].data, labels, topk=(1,))
+            acc_batch, batch_correct_preds = accuracy(preds.data, labels, topk=(1,))
             accs.append(acc_batch[0].item())
             total_correct += batch_correct_preds
             total_samples += preds.size(0)
@@ -230,13 +230,13 @@ with torch.cuda.device(0):
 
 
             #Compute loss
-            loss = criterion(logits[:,0], labels)
+            loss = criterion(logits, labels)
 
 
             # print statistics
             running_loss += loss.item()
 
-            acc_batch, batch_correct_preds = accuracy(preds[:,0].data, labels, topk=(1,))
+            acc_batch, batch_correct_preds = accuracy(preds.data, labels, topk=(1,))
             accs.append(acc_batch[0].item())
             test_correct += batch_correct_preds
             test_total += preds.size(0)

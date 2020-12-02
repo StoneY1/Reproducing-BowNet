@@ -10,8 +10,6 @@ from dataloader import DataLoader, GenericDataset
 import matplotlib.pyplot as plt
 
 from model import BowNet
-#from model import BowNet2 as BowNet
-#from model import BowNet3 as BowNet
 from model import load_checkpoint
 from tqdm import tqdm
 import torch
@@ -70,10 +68,11 @@ bownet = BowNet(num_classes=4).to(device)
 criterion = nn.CrossEntropyLoss().to(device)
 
 
-PATH = "best_bownet_checkpoint1.pt"
+PATH = "best_rotnet_checkpoint1_7985acc.pt"
 checkpoint = torch.load(PATH, map_location=torch.device('cpu'))
 
 bownet,_,_,_ = load_checkpoint(checkpoint,device, BowNet)
+bownet.eval()
 with torch.cuda.device(0):
     print(f"EVALUATION")
 
@@ -100,13 +99,13 @@ with torch.cuda.device(0):
         # print(preds[:,0])
 
         #Compute loss
-        loss = criterion(logits[:,0], labels)
+        loss = criterion(logits, labels)
 
 
         # print statistics
         running_loss += loss.item()
 
-        acc_batch, batch_correct_preds = accuracy(preds[:,0].data, labels, topk=(1,))
+        acc_batch, batch_correct_preds = accuracy(preds.data, labels, topk=(1,))
         accs.append(acc_batch[0].item())
         test_correct += batch_correct_preds
         test_total += preds.size(0) 
