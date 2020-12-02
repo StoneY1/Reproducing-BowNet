@@ -173,9 +173,9 @@ class DataLoader(object):
         my_transformations = [
             transforms.ToPILImage(),
             # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-            transforms.RandomGrayscale(p=0.2),
+            # transforms.RandomGrayscale(p=0.2),
             transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
-            transforms.RandomResizedCrop(32, scale=(0.2, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
+            # transforms.RandomResizedCrop(32, scale=(0.01, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=mean_pix, std=std_pix)

@@ -108,7 +108,8 @@ num_epochs = 200
 criterion = nn.CrossEntropyLoss().to(device)
 optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
 #optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
+lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
+# lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
 
 for para in bownet.parameters():
     para.requires_grad = False
@@ -251,3 +252,13 @@ with torch.cuda.device(0):
         print("Time to finish an epoch ", time.time() - start_epoch)
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_test), running_loss / len(dloader_test)))
+
+        file_name = "rotnet_linearclf_" + str(epoch) +"_" + str(100*test_correct/test_total) + ".pt"
+        PATH = "./rotnet_linear_ckpt/" + file_name
+        #PATH = "bownet_checkpoint2.pt"
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': classifier.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,
+            }, PATH)
