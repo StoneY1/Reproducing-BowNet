@@ -106,7 +106,7 @@ classifier = LinearClassifier(100).to(device)
 num_epochs = 200
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(classifier.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-6)
+optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
 #optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
 
