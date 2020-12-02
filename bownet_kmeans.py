@@ -53,6 +53,24 @@ dloader_test = DataLoader(
     num_workers=4,
     shuffle=False)
 
+# Need separate dataloader with mode == 'rotation' for generating the BOW vocab of RotNet
+# This way, we are able to capture the proper distribution of feature maps that were learned 
+# Using the self-supervised pretext task
+dataset_rotnet_vocab = GenericDataset(
+    dataset_name='cifar100',
+    split='train',
+    random_sized_crop=False,
+    num_imgs_per_cat=None)
+
+dloader_rotnet_vocab = DataLoader(
+    dataset=dataset_train,
+    batch_size=128,
+    mode='rotation',
+    epoch_size=None,
+    num_workers=4,
+    shuffle=True)
+
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
@@ -60,7 +78,7 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
     feature_vectors_list = []
 
     # Iterate through trainset, compiling set of feature maps before performing KMeans clustering
-    for i, data in enumerate(tqdm(dloader_train(0))):
+    for i, data in enumerate(tqdm(dloader_rotnet_vocab(0))):
             # get the inputs; data is a list of [inputs, labels]
             inputs, _ = data
             inputs = inputs.cuda()
@@ -75,14 +93,27 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
 
     rotnet_feature_vectors = np.array(feature_vectors_list)
     
-
     # Using MiniBatchKmeans because regular KMeans is too compute heavy
     start = time.time()
-    sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=5, max_iter=100).fit(rotnet_feature_vectors)
+    sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=5, max_iter=100, batch_size=512).fit(rotnet_feature_vectors)
     print(f"MiniBatchKMeans takes {time.time() - start}s")
     rotnet_vocab = sk_kmeans.cluster_centers_
 
     return sk_kmeans, rotnet_vocab
+
+def initialize_kmeans_from_vocab(vocab_path, K: int=2048, num_features: int=256):
+    """Loads cluster_centers from a NPY file and initializes an SKLearn.KMeans object with given BOW vocab.
+    This way we won't need to regenerate a new codebook every time we want to run a BowNet experiment.
+    """
+
+    bow_vocab = np.load(vocab_path)
+    test_data = np.random.uniform(0, 1, size=(K, num_features)).astype('float32')
+    # A rather un-elegant hack, but we need to call fit() in order to use the predict() method
+    loaded_kmeans = KMeans(n_clusters=K, n_init=1, max_iter=1).fit(test_data)
+    # Replace the cluster_centers_ with those loaded from the rotnet_vocab.npy
+    loaded_kmeans.cluster_centers_ = bow_vocab
+
+    return loaded_kmeans
 
 def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
     """Given a KMeans vocab and collection of fmaps, generates the associated BOW histogram"""
@@ -94,7 +125,7 @@ def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
 def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_checkpoint, K: int=2048):
     """Main training method presented in the paper. 
     Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
-    num_epochs = 150
+    num_epochs = 200
     checkpoint = 'bownet_bow_training_checkpoint.pt'
 
     # Loading frozen RotNet checkpoint
@@ -109,7 +140,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
     bownet = BowNet(num_classes=K, bow_training=True).to(device)
     rotnet.eval()
     criterion = SoftCrossEntropyLoss().to(device)
-    optimizer = optim.SGD(bownet.parameters(), lr=0.01, momentum=0.9)
+    optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=60, gamma=0.1)
     for epoch in range(num_epochs):  # loop over the dataset multiple times
         bownet.train()
@@ -140,10 +171,12 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
 
             # print statistics
             running_loss += loss.item()
+            '''
             if i % 100 == 99:    # print every 100 mini-batches
                 print_cnt += 1
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss / (100*print_cnt)))
+            '''
         print(f"[***] Epoch {epoch} training loss: {running_loss/len(dloader_train)}")
         
         torch.save({
@@ -178,6 +211,8 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
     return
 
 with torch.cuda.device(0):
-    sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet)
-    np.save("RotNet_BOW_Vocab.npy", rotnet_vocab)
+    #sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet)
+    #np.save("RotNet_BOW_Vocab.npy", rotnet_vocab)
+    vocab_path = "RotNet_BOW_Vocab.npy"
+    sk_kmeans = initialize_kmeans_from_vocab(vocab_path, K=2048, num_features=256)
     train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, PATH, K=2048)

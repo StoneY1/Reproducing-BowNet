@@ -171,18 +171,17 @@ class DataLoader(object):
         std_pix   = self.dataset.std_pix
 
         my_transformations = [
-            transforms.ToTensor(),
-            transforms.Normalize(mean=mean_pix, std=std_pix),
             transforms.ToPILImage()]
         if mode == 'bow':
             # We use minimal data augmentation for the actual CIFAR supervised training
-            my_transformations.extend([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-            transforms.RandomGrayscale(p=0.2),
+            my_transformations.extend([transforms.ColorJitter(brightness=0.3, contrast=0.2, saturation=0.4, hue=0.2),
+            transforms.RandomGrayscale(p=0.3),
             transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
-            transforms.RandomResizedCrop(32, scale=(0.2, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
+            transforms.RandomResizedCrop(32, scale=(0.5, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
         
         my_transformations.append(transforms.RandomHorizontalFlip())
         my_transformations.append(transforms.ToTensor())
+        my_transformations.append(transforms.Normalize(mean=mean_pix, std=std_pix),)
         
         # If testing we won't use any transforms
         self.passthrough_transform = transforms.Compose([
