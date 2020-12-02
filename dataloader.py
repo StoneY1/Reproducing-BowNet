@@ -171,16 +171,19 @@ class DataLoader(object):
         std_pix   = self.dataset.std_pix
 
         my_transformations = [
-            transforms.ToPILImage(),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-            transforms.RandomGrayscale(p=0.2),
-            transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
-            transforms.RandomResizedCrop(32, scale=(0.2, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
-            transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=mean_pix, std=std_pix)
-        ]
-
+            transforms.ToPILImage()]
+        if mode == 'bow':
+            # We use minimal data augmentation for the actual CIFAR supervised training
+            my_transformations.extend([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
+            transforms.RandomResizedCrop(32, scale=(0.2, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
+        
+        my_transformations.append(transforms.RandomHorizontalFlip())
+        my_transformations.append(transforms.ToTensor())
+        
         # If testing we won't use any transforms
         self.passthrough_transform = transforms.Compose([
             transforms.ToTensor(),
@@ -264,9 +267,6 @@ class DataLoader(object):
                 standardized_img = self.passthrough_transform(label) # Transform name is terrible, but basically it applies ToTensor() and Normalize
                 img = self.transform(img)
                 return img, standardized_img
-                #label = img
-                #img = self.transform(img)
-                #return img, img
                 
             _collate_fun = default_collate
             # print("Not implemeted yet")
