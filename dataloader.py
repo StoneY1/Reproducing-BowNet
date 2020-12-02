@@ -173,13 +173,13 @@ class DataLoader(object):
         my_transformations = [
             transforms.ToPILImage()]
         if mode == 'bow':
-            # We use minimal data augmentation for the actual CIFAR supervised training
+            # We don't use the more aggressive data augmentation for the actual CIFAR supervised training
             my_transformations.extend([transforms.ColorJitter(brightness=0.3, contrast=0.2, saturation=0.4, hue=0.2),
             transforms.RandomGrayscale(p=0.3),
-            transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
-            transforms.RandomResizedCrop(32, scale=(0.5, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
+            transforms.RandomResizedCrop(32, scale=(0.7, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
         
         my_transformations.append(transforms.RandomHorizontalFlip())
+        my_transformations.append(transforms.RandomCrop(32, padding=4, padding_mode='reflect'))
         my_transformations.append(transforms.ToTensor())
         my_transformations.append(transforms.Normalize(mean=mean_pix, std=std_pix),)
         
