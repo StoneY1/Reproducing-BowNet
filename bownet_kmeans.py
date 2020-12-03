@@ -19,12 +19,6 @@ from kmeans_pytorch import kmeans
 # alternatively, we can use SKLearn
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(device)
-PATH = "best_rotnet_checkpoint1_7985acc.pt"
-checkpoint = torch.load(PATH)
-
-rotnet,_,_,_ = load_checkpoint(checkpoint,device, BowNet)
 
 dataset_train = GenericDataset(
     dataset_name='cifar100',
@@ -78,18 +72,19 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
     feature_vectors_list = []
 
     # Iterate through trainset, compiling set of feature maps before performing KMeans clustering
+    rotnet.eval()
     for i, data in enumerate(tqdm(dloader_rotnet_vocab(0))):
-            # get the inputs; data is a list of [inputs, labels]
-            inputs, _ = data
-            inputs = inputs.cuda()
+        # get the inputs; data is a list of [inputs, labels]
+        inputs, _ = data
+        inputs = inputs.cuda()
 
-            # Forward data through bownet, then get resblock_3_256b fmaps
-            # The authors propose densely sampling feature C-dimensional feature vectors at each
-            # spatial location where C is the size of the channel dimension. These feature vectors are used for the KMeans clustering
-            outputs = rotnet(inputs)
-            resblock3_fmaps = rotnet.resblock3_256b_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
-            resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[-1])
-            feature_vectors_list.extend(resblock3_feature_vectors)
+        # Forward data through bownet, then get resblock_3_256b fmaps
+        # The authors propose densely sampling feature C-dimensional feature vectors at each
+        # spatial location where C is the size of the channel dimension. These feature vectors are used for the KMeans clustering
+        outputs = rotnet(inputs)
+        resblock3_fmaps = rotnet.resblock3_256b_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+        resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[-1])
+        feature_vectors_list.extend(resblock3_feature_vectors)
 
     rotnet_feature_vectors = np.array(feature_vectors_list)
     
@@ -122,17 +117,13 @@ def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
     bow_hist_labels = [np.histogram(pred_clusters, bins=K, range=(0, K), density=True)[0] for pred_clusters in batch_pred_clusters]
     return np.array(bow_hist_labels)
 
-def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_checkpoint, K: int=2048):
+def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, K: int=2048):
     """Main training method presented in the paper. 
     Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
     num_epochs = 200
     checkpoint = 'bownet_bow_training_checkpoint.pt'
 
-    # Loading frozen RotNet checkpoint
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    rotnet_ckpt = torch.load(rotnet_checkpoint)
-
-    rotnet, _, _, _ = load_checkpoint(rotnet_ckpt, device, BowNet)
+    # Freeze RotNet checkpoint
     for para in rotnet.parameters():
         para.required_grad = False
 
@@ -210,9 +201,17 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
     print('Finished Training')
     return
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
+PATH = "best_rotnet_checkpoint1_7985acc.pt"
+checkpoint = torch.load(PATH)
+
+rotnet, _, _, _ = load_checkpoint(checkpoint,device, BowNet)
+
 with torch.cuda.device(0):
-    #sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet)
-    #np.save("RotNet_BOW_Vocab.npy", rotnet_vocab)
-    vocab_path = "RotNet_BOW_Vocab.npy"
-    sk_kmeans = initialize_kmeans_from_vocab(vocab_path, K=2048, num_features=256)
-    train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, PATH, K=2048)
+    K = 2048
+    #sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet, K)
+    #np.save(f"{K}_RotNet_BOW_Vocab.npy", rotnet_vocab)
+    vocab_path = f"{K}_RotNet_BOW_Vocab.npy"
+    sk_kmeans = initialize_kmeans_from_vocab(vocab_path, K, num_features=256)
+    train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, rotnet, K)
