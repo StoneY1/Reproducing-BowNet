@@ -34,7 +34,7 @@ dloader_test = get_dataloader('test', 'cifar', batch_size)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-PATH = "rotnet2_checkpoint.pt"
+PATH = "best_bownet_checkpoint1_7285acc.pt"
 #PATH = "best_bownet_checkpoint1_7285acc.pt"
 
 rotnet, _, _, _ = load_checkpoint(PATH, device, BowNet)
@@ -82,8 +82,8 @@ with torch.cuda.device(0):
             #Load data to GPU
             inputs, labels = inputs.cuda(), labels.cuda()
 
-            bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
+            rotnet(inputs)
+            conv_out = rotnet.resblock3_256b_fmaps
             # conv_out = bownet.resblock2_128b_fmaps
 
             # print(conv_out.shape)
@@ -146,8 +146,8 @@ with torch.cuda.device(0):
 
 
             # forward + backward + optimize
-            bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
+            rotnet(inputs)
+            conv_out = rotnet.resblock3_256b_fmaps
             # conv_out = bownet.resblock2_128b_fmaps
 
             logits, preds = classifier(conv_out)

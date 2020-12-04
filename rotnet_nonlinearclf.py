@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 import copy
-from model import BowNet, load_checkpoint, LinearClassifier, NonLinearClassifier
+from model import BowNet,LinearClassifier, NonLinearClassifier
 #from model import BowNet3 as BowNet
 from tqdm import tqdm
 import torch
@@ -23,7 +23,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
 #from kmeans_pytorch import kmeans
-
+from utils import load_checkpoint, accuracy
 # Set train and test datasets and the corresponding data loaders
 
 
@@ -36,6 +36,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
 PATH = "best_bownet_checkpoint1_7285acc.pt"
+print(PATH)
 checkpoint = torch.load(PATH)
 
 bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
