@@ -38,7 +38,7 @@ if args.checkpoint == None:
 
 
 # Set train and test datasets and the corresponding data loaders
-batch_size = 64
+batch_size = 128
 
 dloader_train = get_dataloader('train', 'cifar', batch_size)
 dloader_test = get_dataloader('test', 'cifar', batch_size)

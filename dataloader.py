@@ -9,7 +9,6 @@ from __future__ import print_function
 import torch
 import torch.utils.data as data
 import torchvision
-import torchnet as tnt
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 import numpy as np
