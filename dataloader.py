@@ -111,10 +111,6 @@ class GenericDataset(data.Dataset):
             for k, v in label2ind.items():
                 assert(len(v)==num_imgs_per_cat)
 
-        elif self.dataset_name=='imagenet':
-            raise ValueError('Keeping k examples per category has not been implemented for the {0}'.format(dname))
-        elif self.dataset_name=='place205':
-            raise ValueError('Keeping k examples per category has not been implemented for the {0}'.format(dname))
         else:
             raise ValueError('Not recognized dataset {0}'.format(dname))
 
@@ -198,7 +194,7 @@ class DataLoader(object):
                 transforms.ToTensor()
             ])
         else:
-            print("Compse transofrom supervised mode")
+            print("Compse transform cifar mode")
             if self.split == "test":
                 print("Testing set has no transforms")
                 self.transform = self.passthrough_transform
