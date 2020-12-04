@@ -7,3 +7,7 @@ S. Gidaris, A. Bursuc, N. Komodakis, P. Pérez, and M. Cord, “Learning Represe
 Cifa dataset rotated in 0 90 180 and 270
 
 https://drive.google.com/drive/folders/14JMAO0xeaFt7VCYoc0DhKEbia0F_GuVO?usp=sharing
+
+Before running the experiments:
+
+Inside the project code, create a folder `./datasets/CIFAR`, download the dataset from https://www.cs.toronto.edu/~kriz/cifar.html and put in the folder. 
