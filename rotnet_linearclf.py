@@ -1,5 +1,6 @@
 from __future__ import print_function
 import argparse
+import sys
 import os
 import imp
 from dataloader import DataLoader, GenericDataset, get_dataloader
@@ -27,12 +28,13 @@ from sklearn.cluster import MiniBatchKMeans
 #from kmeans_pytorch import kmeans
 
 
-import argparse
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint',  type=str, help='path to the checkpoint')
 args = parser.parse_args()
+
+if args.checkpoint == None:
+    sys.exit("Please include checkpoint with arg --checkpoint /path/to/checkpoint")
 
 
 # Set train and test datasets and the corresponding data loaders
