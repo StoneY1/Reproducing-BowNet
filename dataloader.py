@@ -175,7 +175,7 @@ class DataLoader(object):
             # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
             # transforms.RandomGrayscale(p=0.2),
             transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
-            # transforms.RandomResizedCrop(32, scale=(0.01, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
+            # transforms.RandomResizedCrop(32, scale=(0.5, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=mean_pix, std=std_pix)
@@ -283,6 +283,39 @@ class DataLoader(object):
 
     def __len__(self):
         return self.epoch_size // self.batch_size
+
+
+def get_dataloader(batch_size=128,mode='cifar'):
+
+    dataset_train = GenericDataset(
+        dataset_name='cifar100',
+        split='train',
+        random_sized_crop=False,
+        num_imgs_per_cat=None)
+    dataset_test = GenericDataset(
+        dataset_name='cifar100',
+        split='test',
+        random_sized_crop=False)
+
+    dloader_train = DataLoader(
+        dataset=dataset_train,
+        batch_size=batch_size,
+        mode = mode,
+        unsupervised=False,
+        epoch_size=None,
+        num_workers=4,
+        shuffle=True)
+
+    dloader_test = DataLoader(
+        dataset=dataset_test,
+        batch_size=batch_size,
+        unsupervised=False,
+        mode = mode,
+        epoch_size=None,
+        num_workers=4,
+        shuffle=False)
+
+    return dloader_train,dloader_test
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt

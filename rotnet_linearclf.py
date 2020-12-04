@@ -2,7 +2,7 @@ from __future__ import print_function
 import argparse
 import os
 import imp
-from dataloader import DataLoader, GenericDataset
+from dataloader import get_dataloader,DataLoader, GenericDataset
 import matplotlib.pyplot as plt
 
 
@@ -25,25 +25,7 @@ from sklearn.cluster import MiniBatchKMeans
 #from kmeans_pytorch import kmeans
 
 # Set train and test datasets and the corresponding data loaders
-batch_size = 128
 
-data_train_opt = {}
-data_train_opt['batch_size'] = batch_size
-data_train_opt['unsupervised'] = False #Set to False then the label is the class - Set to True to get rotation label
-data_train_opt['epoch_size'] = None
-data_train_opt['random_sized_crop'] = False
-data_train_opt['dataset_name'] = 'cifar100'
-data_train_opt['split'] = 'train'
-
-data_test_opt = {}
-data_test_opt['batch_size'] = batch_size
-data_test_opt['unsupervised'] = False #Set to False then the label is the class - Set to True to get rotation label
-data_test_opt['epoch_size'] = None
-data_test_opt['random_sized_crop'] = False
-data_test_opt['dataset_name'] = 'cifar100'
-data_test_opt['split'] = 'test'
-
-imgs_per_cat = data_train_opt['imgs_per_cat'] if ('imgs_per_cat' in data_train_opt) else None
 
 
 def accuracy(output, target, topk=(1,)):
@@ -62,35 +44,7 @@ def accuracy(output, target, topk=(1,)):
         res.append(correct_k.mul_(100.0 / batch_size))
     return res, correct_preds.int().item()
 
-
-
-dataset_train = GenericDataset(
-    dataset_name=data_train_opt['dataset_name'],
-    split=data_train_opt['split'],
-    random_sized_crop=data_train_opt['random_sized_crop'],
-    num_imgs_per_cat=imgs_per_cat)
-dataset_test = GenericDataset(
-    dataset_name=data_test_opt['dataset_name'],
-    split=data_test_opt['split'],
-    random_sized_crop=data_test_opt['random_sized_crop'])
-
-dloader_train = DataLoader(
-    dataset=dataset_train,
-    batch_size=data_train_opt['batch_size'],
-    mode = 'cifar',
-    unsupervised=data_train_opt['unsupervised'],
-    epoch_size=data_train_opt['epoch_size'],
-    num_workers=4,
-    shuffle=True)
-
-dloader_test = DataLoader(
-    dataset=dataset_test,
-    batch_size=data_test_opt['batch_size'],
-    unsupervised=data_test_opt['unsupervised'],
-    mode = 'cifar',
-    epoch_size=data_test_opt['epoch_size'],
-    num_workers=4,
-    shuffle=False)
+dloader_train,dloader_test = get_dataloader(batch_size=128,mode='cifar')
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -101,14 +55,15 @@ checkpoint = torch.load(PATH)
 
 bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
 
-classifier = LinearClassifier(100).to(device)
-#classifier = LinearClassifier(100, 256, 8).to(device)
-num_epochs = 200
+# classifier = LinearClassifier(100).to(device)
+classifier = LinearClassifier(100, 256, 8).to(device)
+# classifier = LinearClassifier(100, 128, 16).to(device)
+num_epochs = 400
 
 criterion = nn.CrossEntropyLoss().to(device)
 optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
-#optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
+# optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
+lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
 # lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
 
 for para in bownet.parameters():
@@ -148,6 +103,7 @@ with torch.cuda.device(0):
 
             bownet(inputs)
             conv_out = bownet.resblock3_256b_fmaps
+            # conv_out = bownet.resblock2_128b_fmaps
 
             # print(conv_out.shape)
 
@@ -226,6 +182,7 @@ with torch.cuda.device(0):
             # forward + backward + optimize
             bownet(inputs)
             conv_out = bownet.resblock3_256b_fmaps
+            # conv_out = bownet.resblock2_128b_fmaps
 
             logits, preds = classifier(conv_out)
 

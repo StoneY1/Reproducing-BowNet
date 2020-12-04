@@ -21,7 +21,8 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
-PATH = "best_rotnet_checkpoint1_7985acc.pt"
+# PATH = "best_rotnet_checkpoint1_7985acc.pt"
+PATH = "best_bownet_checkpoint1_7285acc.pt"
 checkpoint = torch.load(PATH)
 
 rotnet,_,_,_ = load_checkpoint(checkpoint,device, BowNet)
@@ -70,11 +71,17 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
             # spatial location where C is the size of the channel dimension. These feature vectors are used for the KMeans clustering
             outputs = rotnet(inputs)
             resblock3_fmaps = rotnet.resblock3_256b_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+            print(resblock3_fmaps.shape)
             resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[-1])
+
+            print(resblock3_feature_vectors.shape)
             feature_vectors_list.extend(resblock3_feature_vectors)
 
+
+
     rotnet_feature_vectors = np.array(feature_vectors_list)
-    
+    print(rotnet_feature_vectors.shape)
+
 
     # Using MiniBatchKmeans because regular KMeans is too compute heavy
     start = time.time()
@@ -92,7 +99,7 @@ def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
     return np.array(bow_hist_labels)
 
 def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_checkpoint, K: int=2048):
-    """Main training method presented in the paper. 
+    """Main training method presented in the paper.
     Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
     num_epochs = 150
     checkpoint = 'bownet_bow_training_checkpoint.pt'
@@ -145,7 +152,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet_c
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss / (100*print_cnt)))
         print(f"[***] Epoch {epoch} training loss: {running_loss/len(dloader_train)}")
-        
+
         torch.save({
             'epoch': epoch,
             'model_state_dict': bownet.state_dict(),
