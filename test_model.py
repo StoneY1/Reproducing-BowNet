@@ -1,6 +1,4 @@
 
-
-
 from __future__ import print_function
 import argparse
 import copy
@@ -9,7 +7,7 @@ import imp
 from dataloader import DataLoader, GenericDataset, get_dataloader
 import matplotlib.pyplot as plt
 
-from model import BowNet
+from model import BowNet2 as BowNet
 from utils import load_checkpoint, accuracy
 from tqdm import tqdm
 import torch
@@ -20,16 +18,16 @@ import time
 import numpy as np
 
 # Set train and test datasets and the corresponding data loaders
-batch_size = 128
+batch_size = 64
 
-dloader_test = get_dloader('test', 'cifar', batch_size)
+dloader_test = get_dataloader('test', 'rotation', batch_size)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_epochs = 200
-bownet = BowNet(num_classes=4).to(device)
 criterion = nn.CrossEntropyLoss().to(device)
 
-PATH = "best_rotnet_checkpoint1_7985acc.pt"
+PATH = "rotnet2_checkpoint.pt"
+#PATH = "best_rotnet_checkpoint1_7985acc.pt"
 
 bownet,_,_,_ = load_checkpoint(PATH, device, BowNet)
 bownet.eval()
@@ -52,13 +50,11 @@ with torch.cuda.device(0):
         inputs, labels = inputs.cuda(), labels.cuda()
         time_load_data = time.time() - start_time
 
-
         # forward + backward + optimize
         logits, preds = bownet(inputs)
 
         #Compute loss
         loss = criterion(logits, labels)
-
 
         # print statistics
         running_loss += loss.item()
@@ -67,7 +63,6 @@ with torch.cuda.device(0):
         accs.append(acc_batch[0].item())
         test_correct += batch_correct_preds
         test_total += preds.size(0) 
-
 
     accs = np.array(accs)
     #print("epoche test accuracy: ",accs.mean())

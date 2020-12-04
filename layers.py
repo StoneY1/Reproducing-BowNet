@@ -47,15 +47,15 @@ class ResidualBlock(nn.Module):
         self.bn1 = nn.BatchNorm2d(num_features=self.c_out)
         self.relu1 = nn.ReLU()
         if self.use_dropout:
-            self.dropout = nn.Dropout(self.dropout_rate)
+            self.dropout = nn.Dropout2d(self.dropout_rate)
 
         self.conv2 = nn.Conv2d(in_channels=self.c_out, out_channels=self.c_out, kernel_size=self.ksize, stride=1, padding=self.ksize//2)
         self.bn2 = nn.BatchNorm2d(num_features=self.c_out)
         self.relu2 = nn.ReLU()
-        self.relu_out = nn.ReLU()
 
         if not self.dims_match:
             self.dims_projecting_conv = nn.Conv2d(in_channels=self.c_in, out_channels=self.c_out, kernel_size=1, stride=self.ds_factor)
+        self.relu_out = nn.ReLU()
 
         self.initialize()
 
@@ -64,7 +64,7 @@ class ResidualBlock(nn.Module):
         x = self.relu1(self.bn1(self.conv1(input_tensor)))
         
         if self.use_dropout:
-            self.dropout(x)
+            x = self.dropout(x)
 
         x = self.relu2(self.bn2(self.conv2(x)))
 
