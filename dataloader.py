@@ -170,27 +170,22 @@ class DataLoader(object):
         mean_pix  = self.dataset.mean_pix
         std_pix   = self.dataset.std_pix
 
-        my_transformations = [
-            transforms.ToPILImage()]
+        my_transformations = [transforms.ToPILImage()]
         if mode == 'bow':
             # We don't use the more aggressive data augmentation for the actual CIFAR supervised training
-            my_transformations.append(transforms.RandomGrayscale(p=0.3))
-            my_transformations.append(transforms.ColorJitter(brightness=(0.8, 1.5), contrast=(0.8, 1.5), saturation=(0.8, 1.5), hue=0.1))
-            my_transformations.append(transforms.RandomHorizontalFlip())
-            my_transformations.append(transforms.ToTensor())
-            #my_transformations.append(transforms.Normalize(mean=mean_pix, std=std_pix),)
-            #transforms.RandomResizedCrop(32, scale=(0.7, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
-        else:
-            my_transformations.append(transforms.ColorJitter(brightness=(0.8, 1.5), contrast=(0.8, 1.5), saturation=(0.8, 1.5), hue=0.1))
-            my_transformations.append(transforms.RandomHorizontalFlip())
-            my_transformations.append(transforms.RandomCrop(32, padding=4, padding_mode='reflect'))
-            my_transformations.append(transforms.ToTensor())
-            #my_transformations.append(transforms.Normalize(mean=mean_pix, std=std_pix),)
+            my_transformations.extend([transforms.ColorJitter(brightness=0.3, contrast=0.2, saturation=0.4, hue=0.2),
+            transforms.RandomGrayscale(p=0.3),
+            transforms.RandomResizedCrop(32, scale=(0.7, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
         
+        my_transformations.append(transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2))
+        my_transformations.append(transforms.RandomHorizontalFlip())
+        my_transformations.append(transforms.RandomCrop(32, padding=4, padding_mode='reflect'))
+        my_transformations.append(transforms.ToTensor())
+        
+
         # If testing we won't use any transforms
         self.passthrough_transform = transforms.Compose([
-            transforms.ToTensor(),
-            #transforms.Normalize(mean=mean_pix, std=std_pix)
+            transforms.ToTensor()
             ])
 
         # if self.unsupervised:
@@ -198,8 +193,7 @@ class DataLoader(object):
             self.transform = transforms.Compose([
                 #transforms.ToPILImage(),
                 #transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                #transforms.Normalize(mean=mean_pix, std=std_pix)
+                transforms.ToTensor()
             ])
         else:
             print("Compse transofrom supervised mode")
