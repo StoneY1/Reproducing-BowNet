@@ -27,25 +27,10 @@ from sklearn.cluster import MiniBatchKMeans
 # Set train and test datasets and the corresponding data loaders
 
 
+batch_size = 64
 
-def accuracy(output, target, topk=(1,)):
-    """Computes the precision@k for the specified values of k"""
-    maxk = max(topk)
-    batch_size = target.size(0)
-
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-    res = []
-    for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        correct_preds = copy.deepcopy(correct_k)
-        res.append(correct_k.mul_(100.0 / batch_size))
-    return res, correct_preds.int().item()
-
-
-dloader_train,dloader_test = get_dataloader(batch_size=128,mode='cifar')
+dloader_train = get_dataloader('train', 'cifar', batch_size)
+dloader_test = get_dataloader('test', 'cifar', batch_size)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
