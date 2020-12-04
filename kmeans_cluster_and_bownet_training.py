@@ -14,9 +14,7 @@ import torch.optim as optim
 from model import BowNet, BowNet2
 from utils import load_checkpoint
 from layers import SoftCrossEntropyLoss
-from dataloader import DataLoader, GenericDataset
-from kmeans_pytorch import kmeans
-# alternatively, we can use SKLearn
+from dataloader import DataLoader, GenericDataset, get_dataloader
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
 def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
@@ -42,7 +40,7 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
     
     # Using MiniBatchKmeans because regular KMeans is too compute heavy
     start = time.time()
-    sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=5, max_iter=100, batch_size=512).fit(rotnet_feature_vectors)
+    sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=10, max_iter=300, batch_size=512).fit(rotnet_feature_vectors)
     print(f"MiniBatchKMeans takes {time.time() - start}s")
     rotnet_vocab = sk_kmeans.cluster_centers_
 
@@ -55,8 +53,10 @@ def initialize_kmeans_from_vocab(vocab_path, K: int=2048, num_features: int=256)
 
     bow_vocab = np.load(vocab_path)
     test_data = np.random.uniform(0, 1, size=(K, num_features)).astype('float32')
-    # A rather un-elegant hack, but we need to call fit() in order to use the predict() method
+    
+    # A rather inelegant hack, but we need to call fit() in order to use the predict() method
     loaded_kmeans = MiniBatchKMeans(n_clusters=K, n_init=1, max_iter=1).fit(test_data)
+
     # Replace the cluster_centers_ with those loaded from the rotnet_vocab.npy
     loaded_kmeans.cluster_centers_ = bow_vocab
 
@@ -69,22 +69,18 @@ def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
     bow_hist_labels = [np.histogram(pred_clusters, bins=K, range=(0, K), density=True)[0] for pred_clusters in batch_pred_clusters]
     return np.array(bow_hist_labels)
 
-def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, K: int=2048):
+def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, bownet, bownet_checkpoint_path, K: int=2048, fmap_size: int=8):
     """Main training method presented in the paper. 
     Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
-    num_epochs = 300
-    checkpoint = 'bownet_bow_training_checkpoint.pt'
+    num_epochs = 150
 
     # Freeze RotNet checkpoint
     for para in rotnet.parameters():
         para.required_grad = False
 
-    # Now for actual BoW training, output is equal to K
-    bownet = BowNet(num_classes=K, bow_training=True).to(device)
     rotnet.eval()
     criterion = SoftCrossEntropyLoss().to(device)
-    #optimizer = optim.Adam(bownet.parameters(), lr=0.01, weight_decay=5e-4)
-    optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+    optimizer = optim.SGD(bownet.parameters(), lr=0.05, momentum=0.9, weight_decay=5e-4)
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=120, gamma=0.3)
     for epoch in range(num_epochs):  # loop over the dataset multiple times
         bownet.train()
@@ -107,7 +103,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
 
             logits, preds = bownet(inputs)
             # Not the cleanest way but not much choice given we don't have a CUDA based KMeans function
-            labels = get_bow_histograms(KMeans_vocab, label_fmaps, 64, K)
+            labels = get_bow_histograms(KMeans_vocab, label_fmaps, fmap_size**2, K)
             labels = torch.Tensor(labels).cuda()
             loss = criterion(logits, labels)
             loss.backward()
@@ -123,7 +119,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
             'model_state_dict': bownet.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss,},
-            checkpoint)
+            bownet_checkpoint_path)
 
         torch.cuda.empty_cache()
         optimizer.zero_grad()
@@ -138,7 +134,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
             label_fmaps = rotnet.resblock3_256_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
 
             logits, preds = bownet(inputs)
-            labels = get_bow_histograms(KMeans_vocab, label_fmaps, 64, K)
+            labels = get_bow_histograms(KMeans_vocab, label_fmaps, fmap_size**2, K)
             labels = torch.Tensor(labels).cuda()
             loss = criterion(logits, labels)
 
@@ -152,22 +148,26 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
 if __name__ == "__main__":
     # Need separate dataloader with mode == 'kmeans' for generating the BOW vocab of RotNet
     # This loader just feeds us the training images without the data augmentation
-    dloader_rotnet_vocab = get_dataloader(split="train", mode="kmeans", batch_size=batch_size)
-
+    dloader_rotnet_vocab = get_dataloader(split="train", mode="kmeans", batch_size=128)
+    
+    batch_size = 128
+    #batch_size = 64
+    K = 2048
+    fmap_size = 8
     dloader_train = get_dataloader(split="train", mode="bow", batch_size=batch_size)
     dloader_test = get_dataloader(split="test", mode="bow", batch_size=batch_size)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    #PATH = "best_rotnet_checkpoint1_7985acc.pt"
-    PATH = "rotnet2_checkpoint.pt"
-    rotnet, _, _, _ = load_checkpoint(PATH, device, BowNet2)
+    PATH = "best_rotnet_checkpoint1_7985acc.pt"
+    bownet_checkpoint_path = f'bownet1_K{K}_checkpoint.pt'
+    rotnet, _, _, _ = load_checkpoint(PATH, device, BowNet)
+    # Now for actual BoW training, output is equal to K
+    bownet = BowNet(num_classes=K, bow_training=True).to(device)
 
     with torch.cuda.device(0):
-        #K = 1024
-        K = 2048
-        #K = 512
-        vocab_path = f"{K}_RotNet_BOW_Vocab.npy"
+        vocab_path = f"{K}_RotNet1_BOW_Vocab.npy"
         sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet, K)
         np.save(vocab_path, rotnet_vocab)
+        # If vocab is already generated, we can initialize a KMeans object and go straight to BOW training
         #sk_kmeans = initialize_kmeans_from_vocab(vocab_path, K, num_features=256)
-        train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, rotnet, K)
+        train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, rotnet, bownet, bownet_checkpoint_path, K, fmap_size)

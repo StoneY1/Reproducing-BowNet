@@ -173,9 +173,8 @@ class DataLoader(object):
         my_transformations = [transforms.ToPILImage()]
         if mode == 'bow':
             # We don't use the more aggressive data augmentation for the actual CIFAR supervised training
-            my_transformations.extend([transforms.ColorJitter(brightness=0.3, contrast=0.2, saturation=0.4, hue=0.2),
-            transforms.RandomGrayscale(p=0.3),
-            transforms.RandomResizedCrop(32, scale=(0.7, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
+            my_transformations.append(transforms.RandomGrayscale(p=0.3))
+            my_transformations.append(transforms.RandomResizedCrop(32, scale=(0.8, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2))
         
         my_transformations.append(transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2))
         my_transformations.append(transforms.RandomHorizontalFlip())
@@ -188,11 +187,8 @@ class DataLoader(object):
             transforms.ToTensor()
             ])
 
-        # if self.unsupervised:
         if (self.mode == 'rotation'):
             self.transform = transforms.Compose([
-                #transforms.ToPILImage(),
-                #transforms.RandomHorizontalFlip(),
                 transforms.ToTensor()
             ])
         else:
@@ -202,15 +198,7 @@ class DataLoader(object):
                 self.transform = self.passthrough_transform
             else:
                 self.transform = transforms.Compose(my_transformations)
-                self.inv_transform = transforms.Compose([
-                Denormalize(mean_pix, std_pix),
-                lambda x: x.numpy() * 255.0,
-                lambda x: x.transpose(1,2,0).astype(np.uint8),
-                ])
 
-        # else:
-        #     print("Not implemeted yet")
-            #Something for mode bow
 
     def get_iterator(self, epoch=0):
         # print("get iterator")
@@ -227,7 +215,6 @@ class DataLoader(object):
                 idx = idx % len(self.dataset)
                 img0, _ = self.dataset[idx]
                 img0 = np.array(img0)
-                # print(img0)
                 rotated_imgs = [
                     self.transform(img0),
                     self.transform(rotate_img(img0,  90)),
@@ -244,7 +231,6 @@ class DataLoader(object):
                 batch[0] = batch[0].view([batch_size*rotations, channels, height, width])
                 batch[1] = batch[1].view([batch_size*rotations])
                 return batch
-        # else: # supervised mode
         elif(self.mode == "cifar"):
             print("get iterator supervised mode")
             # if in supervised mode define a loader function that given the

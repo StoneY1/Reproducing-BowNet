@@ -1,7 +1,9 @@
 datasets/
 __pycache__/
 *.ipynb_checkpoints
+*.swp
 *.ipynb
 *.png
+*.npy
 *.pt
 bownet_checkpoint

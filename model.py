@@ -17,31 +17,36 @@ class BowNet(nn.Module):
     def __init__(self, num_classes, bow_training=False):
         """Define layers"""
         super().__init__()
+        print("[**] Using BowNet1")
         self.num_classes = num_classes
         self.bow_training = bow_training
         self.conv1_64 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.bn1_64 = nn.BatchNorm2d(num_features=64)
         self.relu1_64 = nn.ReLU()
 
+        # Resblock 1
         self.resblock1_64a = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=2)
         self.resblock1_64b = ResidualBlock(in_channels=64, out_channels=64, kernel_size=3, downsample_factor=1)
+
+        # Resblock 2
         self.resblock2_128a = ResidualBlock(in_channels=64, out_channels=128, kernel_size=3, downsample_factor=1)
         self.resblock2_128b = ResidualBlock(in_channels=128, out_channels=128, kernel_size=3, downsample_factor=1)
-        self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2, use_dropout=False, dropout_rate=0.3)
-        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1, use_dropout=False, dropout_rate=0.3)
-        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.5)
-        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True, dropout_rate=0.5)
+
+        # Resblock 3
+        self.resblock3_256a = ResidualBlock(in_channels=128, out_channels=256, kernel_size=3, downsample_factor=2)
+        self.resblock3_256b = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1)
+
+        # Rotation prediction head
+        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1)
+        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
 
         self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
         if self.bow_training:
-            #self.fc_out = NormalizedLinear(512, self.num_classes)
-            self.fc_out = NormalizedLinear(256, self.num_classes)
-            #self.fc_fin = 512
             self.fc_fin = 256
+            self.fc_out = NormalizedLinear(self.fc_fin, self.num_classes)
         else:
             self.fc_out = nn.Linear(512, self.num_classes)
             self.fc_fin = 512
-        # self.fc_out = nn.Linear(512,1)
         self.initialize()
 
     def forward(self, input_tensor):
@@ -51,12 +56,13 @@ class BowNet(nn.Module):
         x = self.resblock1_64a(x)
         x = self.resblock1_64b(x)
 
-        self.resblock1_64b_fmaps = x
+        self.resblock1_64_fmaps = x
 
         x = self.resblock2_128a(x)
         x = self.resblock2_128b(x)
-
-        self.resblock2_128b_fmaps = x
+        
+        # We experimented with using different feature maps for training the linear classifier on CIFAR-100 classification
+        self.resblock2_128_fmaps = x
 
         x = self.resblock3_256a(x)
         x = self.resblock3_256b(x)
@@ -64,7 +70,6 @@ class BowNet(nn.Module):
         # We will need these feature maps for the K-means clustering to create a Visual BoW vocabulary
         self.resblock3_256_fmaps = x
 
-        #if True:
         if not self.bow_training:
             # Only add these residual layers for the Rotation pre-training
             x = self.resblock4_512a(x)
@@ -97,6 +102,7 @@ class BowNet2(nn.Module):
     def __init__(self, num_classes, bow_training=False):
         """Define layers"""
         super().__init__()
+        print("[**] Using BowNet2")
         self.num_classes = num_classes
         self.bow_training = bow_training
         self.conv1_64 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=1, padding=1)
@@ -122,17 +128,17 @@ class BowNet2(nn.Module):
         self.resblock3_256d = ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, downsample_factor=1)
 
         # Extra prediction head that is used for RotNet
-        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1)
-        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
-        self.resblock4_512c = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
-        self.resblock4_512d = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1)
+        self.resblock4_512a = ResidualBlock(in_channels=256, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True)
+        self.resblock4_512b = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True)
+        self.resblock4_512c = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True)
+        self.resblock4_512d = ResidualBlock(in_channels=512, out_channels=512, kernel_size=3, downsample_factor=1, use_dropout=True)
         self.global_avg_pool = nn.AvgPool2d(kernel_size=8, stride=1)
         if self.bow_training:
-            self.fc_out = NormalizedLinear(256, self.num_classes)
             self.fc_fin = 256
+            self.fc_out = NormalizedLinear(self.fc_fin, self.num_classes)
         else:
-            self.fc_out = nn.Linear(512, self.num_classes)
             self.fc_fin = 512
+            self.fc_out = nn.Linear(self.fc_fin, self.num_classes)
 
         self.initialize()
 
@@ -143,12 +149,14 @@ class BowNet2(nn.Module):
         x = self.resblock1_64b(x)
         x = self.resblock1_64c(x)
         x = self.resblock1_64d(x)
-        self.resblock1_64b_fmaps = x
+        self.resblock1_64_fmaps = x
 
         x = self.resblock2_128a(x)
         x = self.resblock2_128b(x)
         x = self.resblock2_128c(x)
         x = self.resblock2_128d(x)
+        
+        # We experimented with using different feature maps for training the linear classifier on CIFAR-100 classification
         self.resblock2_128_fmaps = x
 
         x = self.resblock3_256a(x)
