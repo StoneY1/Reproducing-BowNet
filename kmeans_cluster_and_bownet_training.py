@@ -24,6 +24,7 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
     # Iterate through trainset, compiling set of feature maps before performing KMeans clustering
     rotnet.eval()
     for i, data in enumerate(tqdm(dloader_rotnet_vocab(0))):
+
         # get the inputs; data is a list of [inputs, labels]
         inputs, _ = data
         inputs = inputs.cuda()
@@ -36,8 +37,9 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
         resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[-1])
         feature_vectors_list.extend(resblock3_feature_vectors)
 
+
     rotnet_feature_vectors = np.array(feature_vectors_list)
-    
+
     # Using MiniBatchKmeans because regular KMeans is too compute heavy
     start = time.time()
     sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=10, max_iter=300, batch_size=512).fit(rotnet_feature_vectors)
@@ -70,8 +72,10 @@ def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
     return np.array(bow_hist_labels)
 
 def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, bownet, bownet_checkpoint_path, K: int=2048, fmap_size: int=8):
-    """Main training method presented in the paper. 
-    Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
+    """Main training method presented in the paper.
+    Learning to reconstruct BOW representations from perturbed images. Minimizes SoftCrossEntropyLoss.
+    We had to define our own CrossEntropy since the PyTorch version assums discrete classification.""" 
+
     num_epochs = 150
 
     # Freeze RotNet checkpoint
@@ -113,7 +117,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
             running_loss += loss.item()
 
         print(f"[***] Epoch {epoch} training loss: {running_loss/len(dloader_train)}")
-        
+
         torch.save({
             'epoch': epoch,
             'model_state_dict': bownet.state_dict(),
