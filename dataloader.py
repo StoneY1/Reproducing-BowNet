@@ -154,7 +154,7 @@ class DataLoader(object):
                  dataset,
                  batch_size=1,
                  unsupervised=True,
-                 mode='rotation',  #rotation, cifar,bow
+                 mode='rotation',  #rotation, cifar, bow, kmeans
                  epoch_size=None,
                  num_workers=0,
                  shuffle=True):
@@ -182,20 +182,20 @@ class DataLoader(object):
         my_transformations.append(transforms.RandomHorizontalFlip())
         my_transformations.append(transforms.RandomCrop(32, padding=4, padding_mode='reflect'))
         my_transformations.append(transforms.ToTensor())
-        my_transformations.append(transforms.Normalize(mean=mean_pix, std=std_pix),)
+
 
 
         # If testing we won't use any transforms
         self.passthrough_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=mean_pix, std=std_pix)
+            transforms.ToTensor()
             ])
 
         # if self.unsupervised:
         if (self.mode == 'rotation'):
             self.transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=mean_pix, std=std_pix)
+                #transforms.ToPILImage(),
+                #transforms.RandomHorizontalFlip(),
+                transforms.ToTensor()
             ])
         else:
             print("Compse transofrom supervised mode")
@@ -238,6 +238,7 @@ class DataLoader(object):
                 ]
                 rotation_labels = torch.LongTensor([0, 1, 2, 3])
                 return torch.stack(rotated_imgs, dim=0), rotation_labels
+
             def _collate_fun(batch):
                 batch = default_collate(batch)
                 assert(len(batch)==2)
@@ -258,6 +259,18 @@ class DataLoader(object):
                 return img, categorical_label
             _collate_fun = default_collate
 
+        elif(self.mode == "kmeans"):
+            print("get iterator for kmeans")
+            # if in supervised mode define a loader function that given the
+            # index of an image it returns the image and its categorical label
+            def _load_function(idx):
+                idx = idx % len(self.dataset)
+                img, categorical_label = self.dataset[idx]
+                img =np.array(img)
+                img = self.passthrough_transform(img)
+                return img, categorical_label
+            _collate_fun = default_collate
+
         else:
 
             def _load_function(idx):
@@ -265,9 +278,9 @@ class DataLoader(object):
                 img, _ = self.dataset[idx]
                 img =np.array(img)
                 label = copy.deepcopy(img)
-                standardized_img = self.passthrough_transform(label) # Transform name is terrible, but basically it applies ToTensor() and Normalize
+                label_img = self.passthrough_transform(label)
                 img = self.transform(img)
-                return img, standardized_img
+                return img, label_img
 
             _collate_fun = default_collate
             # print("Not implemeted yet")
@@ -285,38 +298,23 @@ class DataLoader(object):
     def __len__(self):
         return self.epoch_size // self.batch_size
 
-
-def get_dataloader(batch_size=128,mode='cifar'):
-
-    dataset_train = GenericDataset(
+def get_dataloader(split, mode, batch_size):
+    """Instantiates GenericDataset and DataLoader objects then returns DataLoader"""
+    dataset = GenericDataset(
         dataset_name='cifar100',
-        split='train',
-        random_sized_crop=False,
-        num_imgs_per_cat=None)
-    dataset_test = GenericDataset(
-        dataset_name='cifar100',
-        split='test',
+        split=split,
         random_sized_crop=False)
 
-    dloader_train = DataLoader(
-        dataset=dataset_train,
+    dloader = DataLoader(
+        dataset=dataset,
         batch_size=batch_size,
-        mode = mode,
-        unsupervised=False,
+        mode=mode,
         epoch_size=None,
         num_workers=4,
         shuffle=True)
 
-    dloader_test = DataLoader(
-        dataset=dataset_test,
-        batch_size=batch_size,
-        unsupervised=False,
-        mode = mode,
-        epoch_size=None,
-        num_workers=4,
-        shuffle=False)
+    return dloader
 
-    return dloader_train,dloader_test
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt

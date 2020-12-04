@@ -2,13 +2,15 @@ from __future__ import print_function
 import argparse
 import os
 import imp
-from dataloader import get_dataloader,DataLoader, GenericDataset
+from dataloader import DataLoader, GenericDataset, get_dataloader
 import matplotlib.pyplot as plt
 
 
 import copy
-from model import BowNet, load_checkpoint, LinearClassifier, NonLinearClassifier
-#from model import BowNet3 as BowNet
+from model import LinearClassifier, NonLinearClassifier
+from utils import load_checkpoint, accuracy
+from model import BowNet
+#from model import BowNet2 as BowNet
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -25,35 +27,17 @@ from sklearn.cluster import MiniBatchKMeans
 #from kmeans_pytorch import kmeans
 
 # Set train and test datasets and the corresponding data loaders
+batch_size = 64
 
-
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the precision@k for the specified values of k"""
-    maxk = max(topk)
-    batch_size = target.size(0)
-
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-    res = []
-    for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        correct_preds = copy.deepcopy(correct_k)
-        res.append(correct_k.mul_(100.0 / batch_size))
-    return res, correct_preds.int().item()
-
-dloader_train,dloader_test = get_dataloader(batch_size=128,mode='cifar')
-
+dloader_train = get_dataloader('train', 'cifar', batch_size)
+dloader_test = get_dataloader('test', 'cifar', batch_size)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(device)
 
-PATH = "best_bownet_checkpoint1_7285acc.pt"
-checkpoint = torch.load(PATH)
+PATH = "rotnet2_checkpoint.pt"
+#PATH = "best_bownet_checkpoint1_7285acc.pt"
 
-bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
+rotnet, _, _, _ = load_checkpoint(PATH, device, BowNet)
 
 # classifier = LinearClassifier(100).to(device)
 classifier = LinearClassifier(100, 256, 8).to(device)
@@ -66,10 +50,10 @@ optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_deca
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
 # lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
 
-for para in bownet.parameters():
+for para in rotnet.parameters():
     para.requires_grad = False
 
-bownet.eval()
+rotnet.eval()
 with torch.cuda.device(0):
 
     classifier.train()
@@ -85,17 +69,14 @@ with torch.cuda.device(0):
         accs = []
         total_correct = 0
         total_samples = 0
-        # Need to set bownet to evaluate so that it uses frozen BatchNorm params and no Dropout
-        bownet.eval()
+        # Need to set rotnet to evaluate so that it uses frozen BatchNorm params and no Dropout
+        rotnet.eval()
         classifier.train()
         for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
-        # for idx, batch in enumerate(dloader_train(epoch)):
 
             start_time = time.time()
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = batch
-
-            # check_input = inputs[0].permute(1, 2, 0)
 
 
             #Load data to GPU
@@ -110,16 +91,11 @@ with torch.cuda.device(0):
 
             time_load_data = time.time() - start_time
 
-            # print(labels.shape)
-
-
             # zero the parameter gradients
             optimizer.zero_grad()
 
             # forward + backward + optimize
             logits, preds = classifier(conv_out)
-
-            # print(preds[:,0])
 
             #Compute loss
             loss = criterion(logits, labels)
@@ -127,8 +103,6 @@ with torch.cuda.device(0):
             #Back Prop and Optimize
             loss.backward()
             optimizer.step()
-
-            # print(classifier.fc1_out.weight.grad)
 
             # print statistics
             running_loss += loss.item()
@@ -140,15 +114,7 @@ with torch.cuda.device(0):
             total_correct += batch_correct_preds
             total_samples += preds.size(0)
 
-            # if idx % 100 == 99:
-            #     print('[%d, %5d] loss: %.3f' %
-            #           (epoch , idx, loss_100/100))
-            #     loss_100 = 0.0
-            #     acc = accuracy(logits[:,0], labels, topk=(1,))[0].item()
-            #     print("accuracy after 100 batch: ",acc)
-            #     print("Time to finish 100 batch", time.time() - start_time)
 
-        accs = np.array(accs)
         print("epoch training accuracy: ", 100*total_correct/total_samples)
 
         print("Time to load the data", time_load_data)
@@ -190,7 +156,6 @@ with torch.cuda.device(0):
             #Compute loss
             loss = criterion(logits, labels)
 
-
             # print statistics
             running_loss += loss.item()
 
@@ -199,8 +164,8 @@ with torch.cuda.device(0):
             test_correct += batch_correct_preds
             test_total += preds.size(0)
 
-
-        lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
+        #lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
+        lr_scheduler.step(running_loss/len(dloader_test))
         accs = np.array(accs)
         #print("epoche test accuracy: ",accs.mean())
         print("epoch test accuracy: ", 100*test_correct/test_total)
