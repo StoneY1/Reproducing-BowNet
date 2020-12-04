@@ -39,14 +39,15 @@ PATH = "rotnet2_checkpoint.pt"
 
 rotnet, _, _, _ = load_checkpoint(PATH, device, BowNet)
 
-classifier = LinearClassifier(100).to(device)
-#classifier = LinearClassifier(100, 256, 8).to(device)
-num_epochs = 200
+# classifier = LinearClassifier(100).to(device)
+classifier = LinearClassifier(100, 256, 8).to(device)
+# classifier = LinearClassifier(100, 128, 16).to(device)
+num_epochs = 400
 
 criterion = nn.CrossEntropyLoss().to(device)
 optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
-#optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
+# optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
+lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
 # lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
 
 for para in rotnet.parameters():
@@ -81,8 +82,11 @@ with torch.cuda.device(0):
             #Load data to GPU
             inputs, labels = inputs.cuda(), labels.cuda()
 
-            rotnet(inputs)
-            conv_out = rotnet.resblock4_512_fmaps
+            bownet(inputs)
+            conv_out = bownet.resblock3_256b_fmaps
+            # conv_out = bownet.resblock2_128b_fmaps
+
+            # print(conv_out.shape)
 
 
             time_load_data = time.time() - start_time
@@ -141,8 +145,10 @@ with torch.cuda.device(0):
             time_load_data = time.time() - start_time
 
 
-            rotnet(inputs)
-            conv_out = rotnet.resblock4_512_fmaps
+            # forward + backward + optimize
+            bownet(inputs)
+            conv_out = bownet.resblock3_256b_fmaps
+            # conv_out = bownet.resblock2_128b_fmaps
 
             logits, preds = classifier(conv_out)
 

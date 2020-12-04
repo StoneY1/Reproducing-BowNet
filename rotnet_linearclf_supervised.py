@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 import copy
 from model import BowNet, load_checkpoint, LinearClassifier, NonLinearClassifier
+
 #from model import BowNet3 as BowNet
 from tqdm import tqdm
 import torch
@@ -16,6 +17,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import time
 import numpy as np
+from itertools import chain
 
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression
@@ -45,7 +47,10 @@ def accuracy(output, target, topk=(1,)):
     return res, correct_preds.int().item()
 
 
+
+
 dloader_train,dloader_test = get_dataloader(batch_size=128,mode='cifar')
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
@@ -53,24 +58,29 @@ print(device)
 PATH = "best_bownet_checkpoint1_7285acc.pt"
 checkpoint = torch.load(PATH)
 
-bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
-
-classifier = NonLinearClassifier(100, 64, 16).to(device)
+# bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
+rotnet = BowNet(100).to(device)
+classifier = LinearClassifier(100).to(device)
 #classifier = LinearClassifier(100, 256, 8).to(device)
-num_epochs = 200
+num_epochs = 400
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
+
+all_params = chain(rotnet.parameters(), classifier.parameters())
+optimizer = optim.SGD(list(rotnet.parameters()) + list(classifier.parameters()), lr=0.001, momentum=0.9, weight_decay=1e-6)
+
+
 #optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.2)
+lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
+# lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=10)
 
-for para in bownet.parameters():
-    para.requires_grad = False
-
-bownet.eval()
+# for para in bownet.parameters():
+#     para.requires_grad = False
+#
+# bownet.eval()
 with torch.cuda.device(0):
 
-    classifier.train()
+
     for epoch in range(num_epochs):  # loop over the dataset multiple times
 
         print()
@@ -84,8 +94,8 @@ with torch.cuda.device(0):
         total_correct = 0
         total_samples = 0
         # Need to set bownet to evaluate so that it uses frozen BatchNorm params and no Dropout
-        bownet.eval()
         classifier.train()
+        rotnet.train()
         for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
         # for idx, batch in enumerate(dloader_train(epoch)):
 
@@ -99,8 +109,8 @@ with torch.cuda.device(0):
             #Load data to GPU
             inputs, labels = inputs.cuda(), labels.cuda()
 
-            bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
+            rotnet(inputs)
+            conv_out = rotnet.resblock3_256b_fmaps
 
             # print(conv_out.shape)
 
@@ -153,8 +163,6 @@ with torch.cuda.device(0):
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_train), running_loss / len(dloader_train)))
 
-
-
         print()
         torch.cuda.empty_cache()
         print("EVALUATION")
@@ -168,6 +176,7 @@ with torch.cuda.device(0):
         test_total = 0
 
         classifier.eval()
+        rotnet.eval()
         for idx, batch in enumerate(tqdm(dloader_test())): #We don't feed epoch to dloader_test because we want a random batch
             start_time = time.time()
             # get the inputs; data is a list of [inputs, labels]
@@ -179,8 +188,8 @@ with torch.cuda.device(0):
 
 
             # forward + backward + optimize
-            bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
+            rotnet(inputs)
+            conv_out = rotnet.resblock3_256b_fmaps
 
             logits, preds = classifier(conv_out)
 
@@ -208,12 +217,12 @@ with torch.cuda.device(0):
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_test), running_loss / len(dloader_test)))
 
-        file_name = "rotnet_nclf_" + str(epoch) +"_" + str(100*test_correct/test_total) + ".pt"
-        PATH = "./rotnet_nonlinear_ckpt/" + file_name
-        #PATH = "bownet_checkpoint2.pt"
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': classifier.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-            }, PATH)
+        # file_name = "rotnet_linearclf_" + str(epoch) +"_" + str(100*test_correct/test_total) + ".pt"
+        # PATH = "./rotnet_linear_ckpt/" + file_name
+        # #PATH = "bownet_checkpoint2.pt"
+        # torch.save({
+        #     'epoch': epoch,
+        #     'model_state_dict': classifier.state_dict(),
+        #     'optimizer_state_dict': optimizer.state_dict(),
+        #     'loss': loss,
+        #     }, PATH)

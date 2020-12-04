@@ -26,6 +26,22 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
     # Iterate through trainset, compiling set of feature maps before performing KMeans clustering
     rotnet.eval()
     for i, data in enumerate(tqdm(dloader_rotnet_vocab(0))):
+<<<<<<< HEAD
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, _ = data
+            inputs = inputs.cuda()
+
+            # Forward data through bownet, then get resblock_3_256b fmaps
+            # The authors propose densely sampling feature C-dimensional feature vectors at each
+            # spatial location where C is the size of the channel dimension. These feature vectors are used for the KMeans clustering
+            outputs = rotnet(inputs)
+            resblock3_fmaps = rotnet.resblock3_256b_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+            print(resblock3_fmaps.shape)
+            resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[-1])
+
+            print(resblock3_feature_vectors.shape)
+            feature_vectors_list.extend(resblock3_feature_vectors)
+=======
         # get the inputs; data is a list of [inputs, labels]
         inputs, _ = data
         inputs = inputs.cuda()
@@ -37,9 +53,12 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
         resblock3_fmaps = rotnet.resblock3_256_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
         resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[-1])
         feature_vectors_list.extend(resblock3_feature_vectors)
+>>>>>>> main
+
+
 
     rotnet_feature_vectors = np.array(feature_vectors_list)
-    
+
     # Using MiniBatchKmeans because regular KMeans is too compute heavy
     start = time.time()
     sk_kmeans = MiniBatchKMeans(n_clusters=K, n_init=5, max_iter=100, batch_size=512).fit(rotnet_feature_vectors)
@@ -70,7 +89,7 @@ def get_bow_histograms(KMeans_vocab, fmaps, spatial_density, K: int=2048):
     return np.array(bow_hist_labels)
 
 def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, K: int=2048):
-    """Main training method presented in the paper. 
+    """Main training method presented in the paper.
     Learning to reconstruct BOW histograms from perturbed images. Minimizes CrossEntropyLoss"""
     num_epochs = 300
     checkpoint = 'bownet_bow_training_checkpoint.pt'
@@ -117,7 +136,7 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
             running_loss += loss.item()
 
         print(f"[***] Epoch {epoch} training loss: {running_loss/len(dloader_train)}")
-        
+
         torch.save({
             'epoch': epoch,
             'model_state_dict': bownet.state_dict(),
