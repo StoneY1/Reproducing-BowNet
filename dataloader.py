@@ -154,7 +154,7 @@ class DataLoader(object):
                  dataset,
                  batch_size=1,
                  unsupervised=True,
-                 mode='rotation',  #rotation, cifar,bow
+                 mode='rotation',  #rotation, cifar, bow, kmeans
                  epoch_size=None,
                  num_workers=0,
                  shuffle=True):
@@ -174,26 +174,32 @@ class DataLoader(object):
             transforms.ToPILImage()]
         if mode == 'bow':
             # We don't use the more aggressive data augmentation for the actual CIFAR supervised training
-            my_transformations.extend([transforms.ColorJitter(brightness=0.3, contrast=0.2, saturation=0.4, hue=0.2),
-            transforms.RandomGrayscale(p=0.3),
-            transforms.RandomResizedCrop(32, scale=(0.7, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
-        
-        my_transformations.append(transforms.RandomHorizontalFlip())
-        my_transformations.append(transforms.RandomCrop(32, padding=4, padding_mode='reflect'))
-        my_transformations.append(transforms.ToTensor())
-        my_transformations.append(transforms.Normalize(mean=mean_pix, std=std_pix),)
+            my_transformations.append(transforms.RandomGrayscale(p=0.3))
+            my_transformations.append(transforms.ColorJitter(brightness=(0.8, 1.5), contrast=(0.8, 1.5), saturation=(0.8, 1.5), hue=0.1))
+            my_transformations.append(transforms.RandomHorizontalFlip())
+            my_transformations.append(transforms.ToTensor())
+            #my_transformations.append(transforms.Normalize(mean=mean_pix, std=std_pix),)
+            #transforms.RandomResizedCrop(32, scale=(0.7, 1.0), ratio=(0.75, 1.3333333333333333), interpolation=2)])
+        else:
+            my_transformations.append(transforms.ColorJitter(brightness=(0.8, 1.5), contrast=(0.8, 1.5), saturation=(0.8, 1.5), hue=0.1))
+            my_transformations.append(transforms.RandomHorizontalFlip())
+            my_transformations.append(transforms.RandomCrop(32, padding=4, padding_mode='reflect'))
+            my_transformations.append(transforms.ToTensor())
+            #my_transformations.append(transforms.Normalize(mean=mean_pix, std=std_pix),)
         
         # If testing we won't use any transforms
         self.passthrough_transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=mean_pix, std=std_pix)
+            #transforms.Normalize(mean=mean_pix, std=std_pix)
             ])
 
         # if self.unsupervised:
         if (self.mode == 'rotation'):
             self.transform = transforms.Compose([
+                #transforms.ToPILImage(),
+                #transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize(mean=mean_pix, std=std_pix)
+                #transforms.Normalize(mean=mean_pix, std=std_pix)
             ])
         else:
             print("Compse transofrom supervised mode")
@@ -236,6 +242,7 @@ class DataLoader(object):
                 ]
                 rotation_labels = torch.LongTensor([0, 1, 2, 3])
                 return torch.stack(rotated_imgs, dim=0), rotation_labels
+
             def _collate_fun(batch):
                 batch = default_collate(batch)
                 assert(len(batch)==2)
@@ -256,6 +263,18 @@ class DataLoader(object):
                 return img, categorical_label
             _collate_fun = default_collate
 
+        elif(self.mode == "kmeans"):
+            print("get iterator for kmeans")
+            # if in supervised mode define a loader function that given the
+            # index of an image it returns the image and its categorical label
+            def _load_function(idx):
+                idx = idx % len(self.dataset)
+                img, categorical_label = self.dataset[idx]
+                img =np.array(img)
+                img = self.passthrough_transform(img)
+                return img, categorical_label
+            _collate_fun = default_collate
+
         else:
 
             def _load_function(idx):
@@ -263,9 +282,9 @@ class DataLoader(object):
                 img, _ = self.dataset[idx]
                 img =np.array(img)
                 label = copy.deepcopy(img)
-                standardized_img = self.passthrough_transform(label) # Transform name is terrible, but basically it applies ToTensor() and Normalize
+                label_img = self.passthrough_transform(label)
                 img = self.transform(img)
-                return img, standardized_img
+                return img, label_img
                 
             _collate_fun = default_collate
             # print("Not implemeted yet")
@@ -282,6 +301,24 @@ class DataLoader(object):
 
     def __len__(self):
         return self.epoch_size // self.batch_size
+
+def get_dataloader(split, mode, batch_size):
+    """Instantiates GenericDataset and DataLoader objects then returns DataLoader"""
+    dataset = GenericDataset(
+        dataset_name='cifar100',
+        split=split,
+        random_sized_crop=False)
+
+    dloader = DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        mode=mode,
+        epoch_size=None,
+        num_workers=4,
+        shuffle=True)
+
+    return dloader
+
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt
