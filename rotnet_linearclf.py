@@ -26,6 +26,15 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
 #from kmeans_pytorch import kmeans
 
+
+import argparse
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--checkpoint',  type=str, help='path to the checkpoint')
+args = parser.parse_args()
+
+
 # Set train and test datasets and the corresponding data loaders
 batch_size = 64
 
@@ -35,7 +44,7 @@ dloader_test = get_dataloader('test', 'cifar', batch_size)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # PATH = "bownet_checkpoint.pt"
-PATH = "best_bownet_checkpoint1_7285acc.pt"
+PATH = args.checkpoint
 
 rotnet, _, _, _ = load_checkpoint(PATH, device, BowNet)
 
@@ -47,8 +56,8 @@ num_epochs = 400
 criterion = nn.CrossEntropyLoss().to(device)
 optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
 # optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
-# lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
+# lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
+lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
 
 for para in rotnet.parameters():
     para.requires_grad = False
