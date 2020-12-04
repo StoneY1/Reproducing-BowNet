@@ -92,12 +92,12 @@ class NormalizedLinear(nn.Module):
         super().__init__()
         self.c_in = in_features
         self.c_out = out_features
-        self.init_limit = np.sqrt(6/(self.c_in + self.c_out))
+        self.init_limit = 2/(self.c_in)
         
         # Initialize all relevant paramters. Weight tensor, normalized weight, gamma scalar
         self.weight = nn.Parameter(torch.Tensor(self.c_out, self.c_in))
         self.weight.data.uniform_(-self.init_limit, self.init_limit) # Classic GlorotUniform initialization
-        self.normed_weight = nn.Parameter(self.weight/torch.norm(self.weight))
+        self.normed_weight = nn.Parameter(self.weight/torch.norm(self.weight, dim=-1).reshape(self.c_out, 1))
         self.gamma = nn.Parameter(torch.Tensor(1,1))
         self.gamma.data.fill_(1.0)
 
