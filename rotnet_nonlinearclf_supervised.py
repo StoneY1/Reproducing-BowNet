@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 
 
 import copy
-from model import BowNet, load_checkpoint, LinearClassifier, NonLinearClassifier
-
+from model import BowNet, LinearClassifier, NonLinearClassifier
+from utils import load_checkpoint, accuracy
 #from model import BowNet3 as BowNet
 from tqdm import tqdm
 import torch
@@ -26,39 +26,15 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
 #from kmeans_pytorch import kmeans
 
+
 # Set train and test datasets and the corresponding data loaders
+batch_size = 128
 
-
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the precision@k for the specified values of k"""
-    maxk = max(topk)
-    batch_size = target.size(0)
-
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-    res = []
-    for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        correct_preds = copy.deepcopy(correct_k)
-        res.append(correct_k.mul_(100.0 / batch_size))
-    return res, correct_preds.int().item()
-
-
-
-
-dloader_train,dloader_test = get_dataloader(batch_size=128,mode='cifar')
-
+dloader_train = get_dataloader('train', 'cifar', batch_size)
+dloader_test = get_dataloader('test', 'cifar', batch_size)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(device)
 
-PATH = "best_bownet_checkpoint1_7285acc.pt"
-checkpoint = torch.load(PATH)
-
-# bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
 rotnet = BowNet(100).to(device)
 classifier = NonLinearClassifier(100).to(device)
 #classifier = LinearClassifier(100, 256, 8).to(device)
@@ -71,8 +47,8 @@ optimizer = optim.SGD(list(rotnet.parameters()) + list(classifier.parameters()),
 
 
 #optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
-# lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=10)
+# lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
+lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=10)
 
 # for para in bownet.parameters():
 #     para.requires_grad = False
@@ -110,7 +86,7 @@ with torch.cuda.device(0):
             inputs, labels = inputs.cuda(), labels.cuda()
 
             rotnet(inputs)
-            conv_out = rotnet.resblock3_256b_fmaps
+            conv_out = rotnet.resblock3_256_fmaps
 
             # print(conv_out.shape)
 
@@ -189,7 +165,7 @@ with torch.cuda.device(0):
 
             # forward + backward + optimize
             rotnet(inputs)
-            conv_out = rotnet.resblock3_256b_fmaps
+            conv_out = rotnet.resblock3_256_fmaps
 
             logits, preds = classifier(conv_out)
 
@@ -207,7 +183,8 @@ with torch.cuda.device(0):
             test_total += preds.size(0)
 
 
-        lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
+        # lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
+        lr_scheduler.step(running_loss/len(dloader_test))
         accs = np.array(accs)
         #print("epoche test accuracy: ",accs.mean())
         print("epoch test accuracy: ", 100*test_correct/test_total)

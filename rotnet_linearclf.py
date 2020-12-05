@@ -58,8 +58,8 @@ num_epochs = 400
 criterion = nn.CrossEntropyLoss().to(device)
 optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
 # optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
-# lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
+# lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
+lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
 
 for para in rotnet.parameters():
     para.requires_grad = False
@@ -175,8 +175,8 @@ with torch.cuda.device(0):
             test_correct += batch_correct_preds
             test_total += preds.size(0)
 
-        lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
-        # lr_scheduler.step(running_loss/len(dloader_test))
+        # lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
+        lr_scheduler.step(running_loss/len(dloader_test))
         accs = np.array(accs)
         #print("epoche test accuracy: ",accs.mean())
         print("epoch test accuracy: ", 100*test_correct/test_total)
