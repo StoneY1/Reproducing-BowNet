@@ -10,4 +10,8 @@ https://drive.google.com/drive/folders/14JMAO0xeaFt7VCYoc0DhKEbia0F_GuVO?usp=sha
 
 Before running the experiments:
 
-Inside the project code, create a folder `./datasets/CIFAR`, download the dataset CIFAR100 from https://www.cs.toronto.edu/~kriz/cifar.html and put in the folder. 
+Inside the project code, create a folder `./datasets/CIFAR`, download the dataset CIFAR100 from https://www.cs.toronto.edu/~kriz/cifar.html and put in the folder.
+
+To run `rotnet_linearclf.py`, you need to have the checkpoint, download here.
+
+`python rotnet_linearclf.py --checkpoint /path/to/checkpoint`
