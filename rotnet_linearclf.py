@@ -38,7 +38,7 @@ if args.checkpoint == None:
 
 
 # Set train and test datasets and the corresponding data loaders
-batch_size = 128
+batch_size = 64
 
 dloader_train = get_dataloader('train', 'cifar', batch_size)
 dloader_test = get_dataloader('test', 'cifar', batch_size)
@@ -175,7 +175,7 @@ with torch.cuda.device(0):
             test_correct += batch_correct_preds
             test_total += preds.size(0)
 
-        # lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
+        #lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
         lr_scheduler.step(running_loss/len(dloader_test))
         accs = np.array(accs)
         #print("epoche test accuracy: ",accs.mean())
