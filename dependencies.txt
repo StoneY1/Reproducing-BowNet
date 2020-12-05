@@ -5,3 +5,4 @@ pytorch >= 1.4.0
 torchnet
 torchvision
 tqdm
+PIL

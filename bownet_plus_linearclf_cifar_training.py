@@ -22,15 +22,14 @@ from sklearn.linear_model import LogisticRegression
 
 from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
-#from kmeans_pytorch import kmeans
 
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
 K_clusters = 2048
-bownet_fmap_depth = 128
-#bownet_fmap_depth = 256
-bownet_fmap_size = 16
-#bownet_fmap_size = 8
+#bownet_fmap_depth = 128
+bownet_fmap_depth = 256
+#bownet_fmap_size = 16
+bownet_fmap_size = 8
 
 dloader_train = get_dataloader('train', 'cifar', batch_size)
 dloader_test = get_dataloader('test', 'cifar', batch_size)
@@ -39,19 +38,15 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 PATH = f"bownet1_checkpoint.pt"
 LINEAR_CLF_PATH = f"bownet1_{bownet_fmap_depth}fmap_linearclf.pt"
-#PATH = "bownet2_checkpoint.pt"
-#LINEAR_CLF_PATH = "bownet2_linearclf.pt"
 bow_training = True
 bownet, _, _, _ = load_checkpoint(PATH, device, BowNet, K_clusters, bow_training)
-#bownet, _, _, _ = load_checkpoint(PATH, device, BowNet2, K_clusters, bow_training)
 
 classifier = LinearClassifier(100, bownet_fmap_depth, bownet_fmap_size).to(device)
-num_epochs = 200
+num_epochs = 400
 
 criterion = nn.CrossEntropyLoss().to(device)
 optimizer = optim.SGD(classifier.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
 lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.3, patience=10)
-#lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
 
 for para in bownet.parameters():
     para.requires_grad = False
@@ -85,8 +80,12 @@ with torch.cuda.device(0):
             inputs, labels = inputs.cuda(), labels.cuda()
 
             bow_logits, softmax_histograms = bownet(inputs)
-            #bownet_fmaps = bownet.resblock3_256_fmaps
-            bownet_fmaps = bownet.resblock2_128_fmaps
+            if bownet_fmap_depth == 256:
+                bownet_fmaps = bownet.resblock3_256_fmaps
+            elif bownet_fmap_depth == 128:
+                bownet_fmaps = bownet.resblock2_128_fmaps
+            else:
+                raise ValueError(f"Wrong fmap depth for bownet features. Got {bownet_fmap_depth}")
 
             time_load_data = time.time() - start_time
 
@@ -149,8 +148,12 @@ with torch.cuda.device(0):
 
 
             bow_logits, softmax_histograms = bownet(inputs)
-            #bownet_fmaps = bownet.resblock3_256_fmaps
-            bownet_fmaps = bownet.resblock2_128_fmaps
+            if bownet_fmap_depth == 256:
+                bownet_fmaps = bownet.resblock3_256_fmaps
+            elif bownet_fmap_depth == 128:
+                bownet_fmaps = bownet.resblock2_128_fmaps
+            else:
+                raise ValueError(f"Wrong fmap depth for bownet features. Got {bownet_fmap_depth}")
 
             logits, preds = classifier(bownet_fmaps)
 
