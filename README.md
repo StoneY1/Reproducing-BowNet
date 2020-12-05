@@ -20,7 +20,7 @@ Before running the experiments:
 
 Inside the project code, create a folder `./datasets/CIFAR`, download the dataset CIFAR100 from https://www.cs.toronto.edu/~kriz/cifar.html and put in the folder.
 
-Pretrained weights of BowNet and RotNet are in saved_weights directory,
+Pretrained weights of BowNet and RotNet are in `saved_weights` directory.
 
 To run `rotnet_linearclf.py` or `rotnet_nonlinearclf.py`, you need to have the checkpoint, download here (eg. saved_weights/rotnet.pt). These scripts load the pretrained RotNet and use its feature maps to train a classifier on CIFAR-100 prediction.
 
