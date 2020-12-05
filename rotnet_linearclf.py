@@ -20,12 +20,10 @@ import torch.optim as optim
 import time
 import numpy as np
 
-from sklearn.svm import LinearSVC
-from sklearn.linear_model import LogisticRegression
 
 from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
-#from kmeans_pytorch import kmeans
+
 
 
 
