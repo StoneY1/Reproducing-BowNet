@@ -7,7 +7,7 @@ import imp
 from dataloader import DataLoader, GenericDataset, get_dataloader
 import matplotlib.pyplot as plt
 
-from model import BowNet2 as BowNet
+from model import BowNet
 from utils import load_checkpoint, accuracy
 from tqdm import tqdm
 import torch
@@ -26,8 +26,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_epochs = 200
 criterion = nn.CrossEntropyLoss().to(device)
 
-PATH = "rotnet2_checkpoint.pt"
-#PATH = "best_rotnet_checkpoint1_7985acc.pt"
+PATH = "best_rotnet_checkpoint1_7985acc.pt"
 
 bownet,_,_,_ = load_checkpoint(PATH, device, BowNet)
 bownet.eval()

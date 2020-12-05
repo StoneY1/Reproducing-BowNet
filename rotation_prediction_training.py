@@ -6,8 +6,7 @@ import imp
 from dataloader import DataLoader, GenericDataset, get_dataloader
 import matplotlib.pyplot as plt
 
-#from model import BowNet
-from model import BowNet2 as BowNet
+from model import BowNet
 from utils import load_checkpoint, accuracy
 from tqdm import tqdm
 import torch
@@ -24,8 +23,7 @@ dloader_test = get_dataloader(split='test', mode='rotation', batch_size=batch_si
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-#PATH = "rotnet1_checkpoint.pt"
-PATH = "rotnet2_checkpoint.pt"
+PATH = "rotnet1_checkpoint.pt"
 
 #rotnet, optimizer, start_epoch, loss = load_checkpoint(PATH, device, BowNet)
 num_epochs = 150

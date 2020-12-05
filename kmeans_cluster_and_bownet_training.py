@@ -5,6 +5,7 @@ Part of our submission for reproducing the CVPR 2020 paper: Learning Representat
 https://arxiv.org/abs/2002.12247
 '''
 import numpy as np
+import argparse
 import time
 from tqdm import tqdm
 import torch
@@ -150,6 +151,14 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
     return
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--checkpoint',  type=str, help='path to the checkpoint')
+    args = parser.parse_args()
+    
+    ROTNET_PATH = args.checkpoint
+    if args.checkpoint == None:
+        sys.exit("Please include checkpoint with arg --checkpoint /path/to/checkpoint")
+
     # Need separate dataloader with mode == 'kmeans' for generating the BOW vocab of RotNet
     # This loader just feeds us the training images without the data augmentation
     dloader_rotnet_vocab = get_dataloader(split="train", mode="kmeans", batch_size=128)
@@ -162,9 +171,8 @@ if __name__ == "__main__":
     dloader_test = get_dataloader(split="test", mode="bow", batch_size=batch_size)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    PATH = "best_rotnet_checkpoint1_7985acc.pt"
     bownet_checkpoint_path = f'bownet1_K{K}_checkpoint.pt'
-    rotnet, _, _, _ = load_checkpoint(PATH, device, BowNet)
+    rotnet, _, _, _ = load_checkpoint(ROTNET_PATH, device, BowNet)
     # Now for actual BoW training, output is equal to K
     bownet = BowNet(num_classes=K, bow_training=True).to(device)
 

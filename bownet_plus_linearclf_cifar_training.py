@@ -17,29 +17,37 @@ import torch.optim as optim
 import time
 import numpy as np
 
-from sklearn.svm import LinearSVC
-from sklearn.linear_model import LogisticRegression
+from sklearn.cluster import KMeans, MiniBatchKMeans
 
-from sklearn.cluster import KMeans
-from sklearn.cluster import MiniBatchKMeans
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--checkpoint',  type=str, help='path to the checkpoint')
+parser.add_argument('--fmap_depth', default=256,  type=int, help='Depth of fmaps used to train linear classifier')
+args = parser.parse_args()
+
+BOWNET_PATH = args.checkpoint
+bownet_fmap_depth = args.fmap_depth
+
+if args.checkpoint == None:
+    sys.exit("Please include checkpoint with arg --checkpoint /path/to/checkpoint")
+
+if args.fmap_depth != 256 and args.fmap_depth != 128:
+    sys.exit("256 and 128 are the only valid fmap depth values")
 
 # Set train and test datasets and the corresponding data loaders
 batch_size = 128
 K_clusters = 2048
-#bownet_fmap_depth = 128
-bownet_fmap_depth = 256
-#bownet_fmap_size = 16
-bownet_fmap_size = 8
+bownet_fmap_size = 8 if bownet_fmap_depth == 256 else 16
 
 dloader_train = get_dataloader('train', 'cifar', batch_size)
 dloader_test = get_dataloader('test', 'cifar', batch_size)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-PATH = f"bownet1_checkpoint.pt"
 LINEAR_CLF_PATH = f"bownet1_{bownet_fmap_depth}fmap_linearclf.pt"
 bow_training = True
-bownet, _, _, _ = load_checkpoint(PATH, device, BowNet, K_clusters, bow_training)
+bownet, _, _, _ = load_checkpoint(BOWNET_PATH, device, BowNet, K_clusters, bow_training)
 
 classifier = LinearClassifier(100, bownet_fmap_depth, bownet_fmap_size).to(device)
 num_epochs = 400
