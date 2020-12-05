@@ -1,14 +1,17 @@
 from __future__ import print_function
 import argparse
+import sys
 import os
 import imp
-from dataloader import get_dataloader,DataLoader, GenericDataset
+from dataloader import DataLoader, GenericDataset, get_dataloader
 import matplotlib.pyplot as plt
 
 
 import copy
-from model import BowNet,LinearClassifier, NonLinearClassifier
-#from model import BowNet3 as BowNet
+from model import LinearClassifier, NonLinearClassifier
+from utils import load_checkpoint, accuracy
+from model import BowNet
+#from model import BowNet2 as BowNet
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -17,13 +20,9 @@ import torch.optim as optim
 import time
 import numpy as np
 
-from sklearn.svm import LinearSVC
-from sklearn.linear_model import LogisticRegression
 
 from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
-#from kmeans_pytorch import kmeans
-from utils import load_checkpoint, accuracy
 # Set train and test datasets and the corresponding data loaders
 
 parser = argparse.ArgumentParser()
@@ -43,10 +42,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
 PATH = args.checkpoint
-print(PATH)
-checkpoint = torch.load(PATH)
 
-bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
+
+rotnet,_,_,_ = load_checkpoint(PATH,device,BowNet)
 
 classifier = NonLinearClassifier(100, 64, 16).to(device)
 #classifier = LinearClassifier(100, 256, 8).to(device)
@@ -57,10 +55,10 @@ optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_deca
 #optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
 lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.2)
 
-for para in bownet.parameters():
+for para in rotnet.parameters():
     para.requires_grad = False
 
-bownet.eval()
+rotnet.eval()
 with torch.cuda.device(0):
 
     classifier.train()
@@ -77,7 +75,7 @@ with torch.cuda.device(0):
         total_correct = 0
         total_samples = 0
         # Need to set bownet to evaluate so that it uses frozen BatchNorm params and no Dropout
-        bownet.eval()
+        rotnet.eval()
         classifier.train()
         for idx, batch in enumerate(tqdm(dloader_train(epoch))): #We feed epoch in dloader_train to get a deterministic batch
         # for idx, batch in enumerate(dloader_train(epoch)):
@@ -92,8 +90,8 @@ with torch.cuda.device(0):
             #Load data to GPU
             inputs, labels = inputs.cuda(), labels.cuda()
 
-            bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
+            rotnet(inputs)
+            conv_out = rotnet.resblock3_256_fmaps
 
             # print(conv_out.shape)
 
@@ -172,8 +170,8 @@ with torch.cuda.device(0):
 
 
             # forward + backward + optimize
-            bownet(inputs)
-            conv_out = bownet.resblock3_256b_fmaps
+            rotnet(inputs)
+            conv_out = rotnet.resblock3_256_fmaps
 
             logits, preds = classifier(conv_out)
 
