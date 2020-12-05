@@ -26,6 +26,13 @@ from sklearn.cluster import MiniBatchKMeans
 from utils import load_checkpoint, accuracy
 # Set train and test datasets and the corresponding data loaders
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--checkpoint',  type=str, help='path to the checkpoint')
+args = parser.parse_args()
+
+if args.checkpoint == None:
+    sys.exit("Please include checkpoint with arg --checkpoint /path/to/checkpoint")
+
 
 batch_size = 64
 
@@ -35,7 +42,7 @@ dloader_test = get_dataloader('test', 'cifar', batch_size)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
-PATH = "best_bownet_checkpoint1_7285acc.pt"
+PATH = args.checkpoint
 print(PATH)
 checkpoint = torch.load(PATH)
 
