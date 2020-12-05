@@ -20,7 +20,7 @@ To run `rotnet_linearclf.py` or `rotnet_nonlinearclf.py`, you need to have the c
 
 `$python rotnet_nonlinearclf.py --checkpoint /path/to/checkpoint`
 
-To run `bownet_plus_linearclf_cifar_training.py` (Takes pretrained BowNet and trains linear classifier on CIFAR-100) or `kmeans_cluster_and_bownet_training.py` (Loads pretrained RotNet, performs KMeans clustering of feature map, then trains BowNet on BOW reconstruction), you also need to have the checkpoint, download here (eg. bownet.pt). 
+To run `bownet_plus_linearclf_cifar_training.py` (Takes pretrained BowNet and trains linear classifier on CIFAR-100) or `kmeans_cluster_and_bownet_training.py` (Loads pretrained RotNet, performs KMeans clustering of feature map, then trains BowNet on BOW reconstruction), you also need to have the checkpoint in `saved_weights` folder (eg. bownet.pt). 
 
 We also include a pre-computed RotNet codebook for K = 2048 clusters. If you include the path to it for `kmeans_cluster_and_bownet_training.py` and the script will skip the codebook generation step and go straight to BOW reconstruction training
 
