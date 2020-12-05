@@ -11,6 +11,7 @@ import torch.utils.data as data
 import torchvision
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+import torchnet as tnt
 import numpy as np
 import random
 from torch.utils.data.dataloader import default_collate

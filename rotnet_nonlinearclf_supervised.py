@@ -7,9 +7,8 @@ import matplotlib.pyplot as plt
 
 
 import copy
-from model import BowNet,LinearClassifier, NonLinearClassifier
+from model import BowNet, LinearClassifier, NonLinearClassifier
 from utils import load_checkpoint, accuracy
-
 #from model import BowNet3 as BowNet
 from tqdm import tqdm
 import torch
@@ -27,17 +26,17 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import MiniBatchKMeans
 #from kmeans_pytorch import kmeans
 
-# Set train and test datasets and the corresponding data loaders
 
+# Set train and test datasets and the corresponding data loaders
 batch_size = 128
+
 dloader_train = get_dataloader('train', 'cifar', batch_size)
 dloader_test = get_dataloader('test', 'cifar', batch_size)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# bownet,_,_,_ = load_checkpoint(checkpoint,device,BowNet)
 rotnet = BowNet(100).to(device)
-classifier = LinearClassifier(100).to(device)
+classifier = NonLinearClassifier(100).to(device)
 #classifier = LinearClassifier(100, 256, 8).to(device)
 num_epochs = 400
 
@@ -48,8 +47,8 @@ optimizer = optim.SGD(list(rotnet.parameters()) + list(classifier.parameters()),
 
 
 #optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
-lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
-# lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=10)
+# lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
+lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=10)
 
 # for para in bownet.parameters():
 #     para.requires_grad = False
@@ -184,8 +183,8 @@ with torch.cuda.device(0):
             test_total += preds.size(0)
 
 
-        lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
-        # lr_scheduler.step(running_loss/len(dloader_test))
+        # lr_scheduler.step() # Use this if not using ReduceLROnPlateau scheduler
+        lr_scheduler.step(running_loss/len(dloader_test))
         accs = np.array(accs)
         #print("epoche test accuracy: ",accs.mean())
         print("epoch test accuracy: ", 100*test_correct/test_total)
