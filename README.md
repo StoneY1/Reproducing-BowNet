@@ -14,4 +14,4 @@ Inside the project code, create a folder `./datasets/CIFAR`, download the datase
 
 To run `rotnet_linearclf.py`, you need to have the checkpoint, download here.
 
-`python rotnet_linearclf.py --checkpoint /path/to/checkpoint`
+`$python rotnet_linearclf.py --checkpoint /path/to/checkpoint`
