@@ -8,22 +8,30 @@ Cifa dataset rotated in 0 90 180 and 270
 
 https://drive.google.com/drive/folders/14JMAO0xeaFt7VCYoc0DhKEbia0F_GuVO?usp=sharing
 
+Code base implemented with PyTorch.
+
+Dataloader is adapted from Github released by authors of the RotNet paper: https://github.com/gidariss/FeatureLearningRotNet
+
+Our model definitions are in `model.py`. Custom loss and layer class definitions are in `layers.py`
+
+See dependencies.txt for list of libraries that need to be installed. Pip install or conda install both work
+
 Before running the experiments:
 
 Inside the project code, create a folder `./datasets/CIFAR`, download the dataset CIFAR100 from https://www.cs.toronto.edu/~kriz/cifar.html and put in the folder.
 
-Pretrained weights of BowNet and RotNet are in saved_weights directory,
+Pretrained weights of BowNet and RotNet are in `saved_weights` directory.
 
-To run `rotnet_linearclf.py` or `rotnet_nonlinearclf.py`, you need to have the checkpoint, download here (eg. rotnet.pt).
+To run `rotnet_linearclf.py` or `rotnet_nonlinearclf.py`, you need to have the checkpoint, download here (eg. saved_weights/rotnet.pt). These scripts load the pretrained RotNet and use its feature maps to train a classifier on CIFAR-100 prediction.
 
 `$python rotnet_linearclf.py --checkpoint /path/to/checkpoint`
 
 `$python rotnet_nonlinearclf.py --checkpoint /path/to/checkpoint`
 
-To run `bownet_plus_linearclf_cifar_training.py` (Takes pretrained BowNet and trains linear classifier on CIFAR-100) or `kmeans_cluster_and_bownet_training.py` (Loads pretrained RotNet, performs KMeans clustering of feature map, then trains BowNet on BOW reconstruction), you also need to have the checkpoint in `saved_weights` folder (eg. bownet.pt). 
+To run `bownet_plus_linearclf_cifar_training.py` (Takes pretrained BowNet and uses feature maps to train linear classifier on CIFAR-100) or `kmeans_cluster_and_bownet_training.py` (Loads pretrained RotNet, performs KMeans clustering of feature map, then trains BowNet on BOW reconstruction), you also need to have the checkpoint, download here (eg. saved_weights/bownet.pt). 
 
-We also include a pre-computed RotNet codebook for K = 2048 clusters. If you include the path to it for `kmeans_cluster_and_bownet_training.py` and the script will skip the codebook generation step and go straight to BOW reconstruction training
+We also include a pre-computed RotNet codebook for K = 2048 clusters. If you include the path to it for `kmeans_cluster_and_bownet_training.py` the script will skip the codebook generation step and go straight to BOW reconstruction training
 
 `$python bownet_plus_linearclf_cifar_training.py --checkpoint /path/to/checkpoint`
 
-`$python kmeans_cluster_and_bownet_training.p --checkpoint /path/to/checkpoint [optional: --rotnet_vocab /path/to/rotnet/vocab.npy]`
+`$python kmeans_cluster_and_bownet_training.p --checkpoint /path/to/vocab.npy [optional: --rotnet_vocab /path/to/rotnet/vocab.npy]`
