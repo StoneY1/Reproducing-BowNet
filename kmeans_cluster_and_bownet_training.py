@@ -153,9 +153,11 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--checkpoint',  type=str, help='path to the checkpoint')
+    parser.add_argument('--rotnet_vocab',  type=str, help='path to precomputed RotNet vocab')
     args = parser.parse_args()
     
     ROTNET_PATH = args.checkpoint
+    VOCAB_PATH = args.rotnet_vocab
     if args.checkpoint == None:
         sys.exit("Please include checkpoint with arg --checkpoint /path/to/checkpoint")
 
@@ -177,9 +179,11 @@ if __name__ == "__main__":
     bownet = BowNet(num_classes=K, bow_training=True).to(device)
 
     with torch.cuda.device(0):
-        vocab_path = f"{K}_RotNet1_BOW_Vocab.npy"
-        sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet, K)
-        np.save(vocab_path, rotnet_vocab)
-        # If vocab is already generated, we can initialize a KMeans object and go straight to BOW training
-        #sk_kmeans = initialize_kmeans_from_vocab(vocab_path, K, num_features=256)
+        vocab_path = f"{K}_RotNet1_BOW_Vocab.npy" if VOCAB_PATH is None else VOCAB_PATH
+        if VOCAB_PATH is None:
+            sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet, K)
+            np.save(vocab_path, rotnet_vocab)
+        else:
+            # If vocab is already generated, we can initialize a KMeans object and go straight to BOW training
+            sk_kmeans = initialize_kmeans_from_vocab(vocab_path, K, num_features=256)
         train_bow_reconstruction(sk_kmeans, dloader_train, dloader_test, rotnet, bownet, bownet_checkpoint_path, K, fmap_size)
