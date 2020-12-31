@@ -12,9 +12,11 @@ def load_checkpoint(checkpoint_path, device, bownet_arch, num_classes=4, bow_tra
     optimizer = optim.SGD(bownet.parameters(), lr=0.1, momentum=0.9,weight_decay= 5e-4)
 
     bownet.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    epoch = checkpoint['epoch']
-    loss = checkpoint['loss']
+    #optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    #epoch = checkpoint['epoch']
+    #loss = checkpoint['loss']
+    epoch = 0
+    loss = 0
 
     return bownet, optimizer, epoch, loss
 

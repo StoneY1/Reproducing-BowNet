@@ -213,6 +213,9 @@ class DataLoader(object):
                 idx = idx % len(self.dataset)
                 img0, _ = self.dataset[idx]
                 img0 = np.array(img0)
+                random_hflip = np.random.randint(0, 2)
+                if random_hflip:
+                    img0 = np.fliplr(img0).copy()
                 rotated_imgs = [
                     self.transform(img0),
                     self.transform(rotate_img(img0,  90)),

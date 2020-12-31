@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 import copy
 from model import LinearClassifier, NonLinearClassifier
 from utils import load_checkpoint, accuracy
-from model import BowNet
+from model import WRN_28_K as BowNet
+#from model import BowNet
 #from model import BowNet2 as BowNet
 from tqdm import tqdm
 import torch
@@ -51,12 +52,12 @@ PATH = args.checkpoint
 rotnet, _, _, _ = load_checkpoint(PATH, device, BowNet)
 
 # classifier = LinearClassifier(100).to(device)
-classifier = LinearClassifier(100, 256, 8).to(device)
+classifier = LinearClassifier(100, 640, 8).to(device)
 # classifier = LinearClassifier(100, 128, 16).to(device)
 num_epochs = 400
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-6)
+optimizer = optim.SGD(classifier.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-6)
 # optimizer = optim.SGD(classifier.parameters(), lr=0.1, momentum=0.9, weight_decay=0.001)
 # lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1)
 lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
@@ -94,7 +95,8 @@ with torch.cuda.device(0):
             inputs, labels = inputs.cuda(), labels.cuda()
 
             rotnet(inputs)
-            conv_out = rotnet.resblock3_256_fmaps
+            conv_out = rotnet.resblock3_fmaps
+            #conv_out = rotnet.resblock3_256_fmaps
             # conv_out = bownet.resblock2_128b_fmaps
 
             # print(conv_out.shape)
@@ -158,7 +160,8 @@ with torch.cuda.device(0):
 
             # forward + backward + optimize
             rotnet(inputs)
-            conv_out = rotnet.resblock3_256_fmaps
+            conv_out = rotnet.resblock3_fmaps
+            #$conv_out = rotnet.resblock3_256_fmaps
             # conv_out = bownet.resblock2_128b_fmaps
 
             logits, preds = classifier(conv_out)
@@ -189,9 +192,11 @@ with torch.cuda.device(0):
         file_name = "rotnet_linearclf_" + str(epoch) +"_" + str(100*test_correct/test_total) + ".pt"
         PATH = "./rotnet_linear_ckpt/" + file_name
         #PATH = "bownet_checkpoint2.pt"
+        '''
         torch.save({
             'epoch': epoch,
             'model_state_dict': classifier.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss,
             }, PATH)
+        '''

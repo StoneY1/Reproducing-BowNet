@@ -33,7 +33,7 @@ class SoftCrossEntropyLoss(Loss):
 
 class ResidualBlock(nn.Module):
     """Basic 2-layer residual block as described in the original ResNet paper https://arxiv.org/abs/1512.03385"""
-    def __init__(self, in_channels, out_channels, kernel_size, downsample_factor, use_dropout=False, dropout_rate=0.5):
+    def __init__(self, in_channels, out_channels, kernel_size, downsample_factor=1, use_dropout=False, dropout_rate=0.5):
         super().__init__()
         self.c_in = in_channels
         self.c_out = out_channels

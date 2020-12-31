@@ -6,7 +6,7 @@ import imp
 from dataloader import DataLoader, GenericDataset, get_dataloader
 import matplotlib.pyplot as plt
 
-from model import BowNet
+from model import BowNet, WRN_28_K
 from utils import load_checkpoint, accuracy
 from tqdm import tqdm
 import torch
@@ -17,22 +17,24 @@ import time
 import numpy as np
 
 # Get train and test dataloaders
-batch_size = 64
+batch_size = 32
 dloader_train = get_dataloader(split='train', mode='rotation', batch_size=batch_size)
 dloader_test = get_dataloader(split='test', mode='rotation', batch_size=batch_size)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-PATH = "rotnet1_checkpoint.pt"
+PATH = "wrn_28_10_checkpoint.pt"
+#PATH = "rotnet1_checkpoint.pt"
 
 #rotnet, optimizer, start_epoch, loss = load_checkpoint(PATH, device, BowNet)
-num_epochs = 150
+num_epochs = 250
 start_epoch = 0
 end_epoch = num_epochs - start_epoch
-rotnet = BowNet(num_classes=4).to(device)
+rotnet = WRN_28_K(num_classes=4).to(device)
+#rotnet = BowNet(num_classes=4).to(device)
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(rotnet.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
-lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=10)
+optimizer = optim.SGD(rotnet.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
+lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=10)
 
 with torch.cuda.device(0):
     for epoch in np.arange(start_epoch, end_epoch):  # loop over the dataset multiple times

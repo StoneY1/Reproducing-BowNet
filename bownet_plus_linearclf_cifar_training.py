@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 import copy
-from model import BowNet, BowNet2, LinearClassifier, NonLinearClassifier
+from model import BowNet, BowNet2, WRN_28_K, LinearClassifier, NonLinearClassifier
 from utils import accuracy, load_checkpoint
 from tqdm import tqdm
 import torch
@@ -36,6 +36,7 @@ if args.fmap_depth != 256 and args.fmap_depth != 128:
     sys.exit("256 and 128 are the only valid fmap depth values")
 
 # Set train and test datasets and the corresponding data loaders
+#batch_size = 64
 batch_size = 128
 K_clusters = 2048
 bownet_fmap_size = 8 if bownet_fmap_depth == 256 else 16
@@ -47,13 +48,14 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 LINEAR_CLF_PATH = f"bownet1_{bownet_fmap_depth}fmap_linearclf.pt"
 bow_training = True
-bownet, _, _, _ = load_checkpoint(BOWNET_PATH, device, BowNet, K_clusters, bow_training)
+bownet, _, _, _ = load_checkpoint(BOWNET_PATH, device, BowNet, 4, False)
+#bownet, _, _, _ = load_checkpoint(BOWNET_PATH, device, BowNet, K_clusters, bow_training)
 
 classifier = LinearClassifier(100, bownet_fmap_depth, bownet_fmap_size).to(device)
 num_epochs = 400
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(classifier.parameters(), lr=0.01, momentum=0.9, weight_decay=0)
+optimizer = optim.SGD(classifier.parameters(), lr=0.001, momentum=0.9, weight_decay=0)
 lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.3, patience=10)
 
 for para in bownet.parameters():
@@ -90,6 +92,7 @@ with torch.cuda.device(0):
             bow_logits, softmax_histograms = bownet(inputs)
             if bownet_fmap_depth == 256:
                 bownet_fmaps = bownet.resblock3_256_fmaps
+                #bownet_fmaps = bownet.resblock3_fmaps
             elif bownet_fmap_depth == 128:
                 bownet_fmaps = bownet.resblock2_128_fmaps
             else:
@@ -125,11 +128,11 @@ with torch.cuda.device(0):
         print('[%d, %5d] epoches loss: %.3f' %
               (epoch, len(dloader_train), running_loss / len(dloader_train)))
         
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': classifier.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss}, LINEAR_CLF_PATH)
+        #torch.save({
+        #    'epoch': epoch,
+        #    'model_state_dict': classifier.state_dict(),
+        #    'optimizer_state_dict': optimizer.state_dict(),
+        #    'loss': loss}, LINEAR_CLF_PATH)
 
         print()
         torch.cuda.empty_cache()
@@ -158,6 +161,7 @@ with torch.cuda.device(0):
             bow_logits, softmax_histograms = bownet(inputs)
             if bownet_fmap_depth == 256:
                 bownet_fmaps = bownet.resblock3_256_fmaps
+                #bownet_fmaps = bownet.resblock3_fmaps
             elif bownet_fmap_depth == 128:
                 bownet_fmaps = bownet.resblock2_128_fmaps
             else:

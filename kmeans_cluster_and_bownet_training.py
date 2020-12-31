@@ -7,12 +7,13 @@ https://arxiv.org/abs/2002.12247
 import numpy as np
 import argparse
 import time
+import copy
 from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from model import BowNet, BowNet2
+from model import BowNet, BowNet2, WRN_28_K
 from utils import load_checkpoint
 from layers import SoftCrossEntropyLoss
 from dataloader import DataLoader, GenericDataset, get_dataloader
@@ -34,7 +35,8 @@ def build_RotNet_vocab(rotnet: BowNet, K: int=2048):
         # The authors propose densely sampling feature C-dimensional feature vectors at each
         # spatial location where C is the size of the channel dimension. These feature vectors are used for the KMeans clustering
         outputs = rotnet(inputs)
-        resblock3_fmaps = rotnet.resblock3_256_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+        resblock3_fmaps = rotnet.resblock3_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+        #resblock3_fmaps = rotnet.resblock3_256_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
         resblock3_feature_vectors = resblock3_fmaps.reshape(-1, resblock3_fmaps.shape[-1])
         feature_vectors_list.extend(resblock3_feature_vectors)
 
@@ -84,8 +86,9 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
         para.required_grad = False
 
     rotnet.eval()
-    criterion = SoftCrossEntropyLoss().to(device)
-    optimizer = optim.SGD(bownet.parameters(), lr=0.05, momentum=0.9, weight_decay=5e-4)
+    criterion = torch.nn.MSELoss().to(device)
+    #criterion = SoftCrossEntropyLoss().to(device)
+    optimizer = optim.SGD(bownet.parameters(), lr=0.0001, momentum=0.9, weight_decay=5e-4)
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=120, gamma=0.3)
     for epoch in range(num_epochs):  # loop over the dataset multiple times
         bownet.train()
@@ -103,14 +106,16 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
 
             # forward + backward + optimize
             # Get feature maps of RotNet generated from reference images
-            rotnet(label_imgs)
-            label_fmaps = rotnet.resblock3_256_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+            rotnet_logits, rotnet_preds = rotnet(label_imgs)
+            #label_fmaps = rotnet.resblock3_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+            #label_fmaps = rotnet.resblock3_256_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
 
-            logits, preds = bownet(inputs)
+            bownet_logits, preds = bownet(inputs)
             # Not the cleanest way but not much choice given we don't have a CUDA based KMeans function
-            labels = get_bow_histograms(KMeans_vocab, label_fmaps, fmap_size**2, K)
-            labels = torch.Tensor(labels).cuda()
-            loss = criterion(logits, labels)
+            #labels = get_bow_histograms(KMeans_vocab, label_fmaps, fmap_size**2, K)
+            #labels = torch.Tensor(labels).cuda()
+            #loss = criterion(logits, labels)
+            loss = criterion(bownet_logits, rotnet_logits)
             loss.backward()
             optimizer.step()
 
@@ -118,12 +123,13 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
             running_loss += loss.item()
 
         print(f"[***] Epoch {epoch} training loss: {running_loss/len(dloader_train)}")
+        #import pdb; pdb.set_trace()
 
         torch.save({
-            'epoch': epoch,
-            'model_state_dict': bownet.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,},
+            #'epoch': epoch,
+            'model_state_dict': bownet.state_dict(),},
+            #'optimizer_state_dict': optimizer.state_dict(),
+            #'loss': loss,},
             bownet_checkpoint_path)
 
         torch.cuda.empty_cache()
@@ -135,13 +141,15 @@ def train_bow_reconstruction(KMeans_vocab, dloader_train, dloader_test, rotnet, 
             inputs = inputs.cuda()
             label_imgs = label_imgs.cuda()
 
-            rotnet(label_imgs)
-            label_fmaps = rotnet.resblock3_256_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+            rotnet_logits, rotnet_preds = rotnet(label_imgs)
+            #label_fmaps = rotnet.resblock3_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
+            #label_fmaps = rotnet.resblock3_256_fmaps.detach().cpu().numpy().transpose((0, 2, 3, 1))
 
             logits, preds = bownet(inputs)
-            labels = get_bow_histograms(KMeans_vocab, label_fmaps, fmap_size**2, K)
-            labels = torch.Tensor(labels).cuda()
-            loss = criterion(logits, labels)
+            #labels = get_bow_histograms(KMeans_vocab, label_fmaps, fmap_size**2, K)
+            #labels = torch.Tensor(labels).cuda()
+            #loss = criterion(logits, labels)
+            loss = criterion(logits, rotnet_logits)
 
             # print statistics
             running_loss += loss.item()
@@ -176,13 +184,16 @@ if __name__ == "__main__":
     bownet_checkpoint_path = f'bownet1_K{K}_checkpoint.pt'
     rotnet, _, _, _ = load_checkpoint(ROTNET_PATH, device, BowNet)
     # Now for actual BoW training, output is equal to K
-    bownet = BowNet(num_classes=K, bow_training=True).to(device)
+    bownet = copy.deepcopy(rotnet)
+    #bownet = BowNet(num_classes=4, bow_training=False).to(device)
+    #bownet = BowNet(num_classes=K, bow_training=True).to(device)
 
     with torch.cuda.device(0):
         vocab_path = f"{K}_RotNet1_BOW_Vocab.npy" if VOCAB_PATH is None else VOCAB_PATH
         if VOCAB_PATH is None:
-            sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet, K)
-            np.save(vocab_path, rotnet_vocab)
+            #sk_kmeans, rotnet_vocab = build_RotNet_vocab(rotnet, K)
+            sk_kmeans = 0
+            #np.save(vocab_path, rotnet_vocab)
         else:
             # If vocab is already generated, we can initialize a KMeans object and go straight to BOW training
             sk_kmeans = initialize_kmeans_from_vocab(vocab_path, K, num_features=256)
